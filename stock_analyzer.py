@@ -154,8 +154,10 @@ class StockAnalyzer:
         found = results["total_found"]
 
         message = f"📊 {market} MA 回撤五日掃描結果\n"
-        message += f"⏰ {results['date']}\n"
-        message += f"掃描: {total} 只股票 | 找到: {found} 只 ✅\n\n"
+        message += f"⏰ 時間：{results['date']}\n"
+        message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        message += f"掃描股票數：{total} 只\n"
+        message += f"符合條件：{found} 只 ✅\n\n"
 
         if found == 0:
             message += "暫無符合條件的股票"
@@ -163,13 +165,14 @@ class StockAnalyzer:
 
         for stock in results["stocks"][:10]:  # Show top 10
             message += f"🔹 {stock['ticker']}\n"
-            message += f"   現價: ${stock['current_price']}\n"
-            message += f"   MA5: ${stock['ma5']} | MA10: ${stock['ma10']}\n"
-            message += f"   支撐: ${stock['support']} | 壓力: ${stock['resistance']}\n"
-            message += f"   趨勢: {stock['trend']}\n\n"
+            message += f"   現價：${stock['current_price']}\n"
+            message += f"   MA5：${stock['ma5']} | MA10：${stock['ma10']}\n"
+            message += f"   MA20：${stock['ma20']}\n"
+            message += f"   支撐：${stock['support']} | 壓力：${stock['resistance']}\n"
+            message += f"   趨勢：{stock['trend']}\n\n"
 
         if found > 10:
-            message += f"...還有 {found - 10} 只股票"
+            message += f"📌 ...還有 {found - 10} 只股票\n"
 
         return message
 
@@ -244,30 +247,32 @@ class StockAnalyzer:
     def format_weekly_analysis(self, result: dict) -> str:
         """Format weekly analysis for display."""
         if "error" in result:
-            return f"❌ {result['error']}"
+            return f"❌ 錯誤：{result['error']}"
 
-        msg = f"📊 週分析 - {result['ticker']}\n"
-        msg += f"📈 現價: ${result['current_price']}\n"
-        msg += f"📅 週收: ${result['weekly_close']}\n"
-        msg += f"📊 MA5W: ${result['ma5w']}\n"
-        msg += f"📊 MA10W: ${result['ma10w']}\n"
-        msg += f"💡 趨勢: {result['trend']}\n"
-        msg += f"⏱️ 週數: {result['weeks_analyzed']}\n"
+        msg = f"📊 週線分析 - {result['ticker']}\n"
+        msg += f"━━━━━━━━━━━━━━━━━━\n"
+        msg += f"📈 現價：${result['current_price']}\n"
+        msg += f"📅 週收：${result['weekly_close']}\n"
+        msg += f"📊 週MA5：${result['ma5w']}\n"
+        msg += f"📊 週MA10：${result['ma10w']}\n"
+        msg += f"💡 趨勢：{result['trend']}\n"
+        msg += f"⏱️ 分析週數：{result['weeks_analyzed']}\n\n"
 
         return msg
 
     def format_historical_data(self, result: dict) -> str:
         """Format historical data for display."""
         if "error" in result:
-            return f"❌ {result['error']}"
+            return f"❌ 錯誤：{result['error']}"
 
-        msg = f"📋 {result['ticker']} 最近 {result['days']} 天\n"
-        msg += f"━" * 40 + "\n"
+        msg = f"📋 {result['ticker']} 過去 {result['days']} 天股價記錄\n"
+        msg += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
         for price in result["prices"][-7:]:  # Show last 7
-            msg += f"📅 {price['date']}\n"
-            msg += f"   開: ${price['open']} | 收: ${price['close']}\n"
-            msg += f"   高: ${price['high']} | 低: ${price['low']}\n"
+            msg += f"📅 日期：{price['date']}\n"
+            msg += f"   開盤：${price['open']} | 收盤：${price['close']}\n"
+            msg += f"   最高：${price['high']} | 最低：${price['low']}\n"
+            msg += f"   成交量：{price['volume']:,}\n\n"
 
         return msg
 

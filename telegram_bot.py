@@ -56,21 +56,37 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         logger.info(f"📍 /start command from {update.effective_user.id}")
         message = """
-👋 歡迎使用 MCP 股票分析 Bot!
+👋 歡迎使用 MCP 股票分析 Bot！
 
-可用命令:
-🇹🇼 /tw_ma - 掃描台股 MA 回撤機會
-🇺🇸 /us_ma - 掃描美股 MA 回撤機會
-📊 /help - 幫助信息
+━━━━━━━━━━━━━━━━━━━━━━
 
-例如: /tw_ma 或 /us_ma
+📊 快速命令：
+  🇹🇼 /tw_ma - 台股 MA 回撤掃描
+  🇺🇸 /us_ma - 美股 MA 回撤掃描
+
+📈 進階功能：
+  📊 /week_ma - 週線分析
+  📋 /history - 歷史股價
+  📈 /chart - 走勢圖表
+
+❓ /help - 完整使用指南
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+💡 快速開始：
+輸入 /tw_ma 即可查看台股機會
+輸入 /us_ma 即可查看美股機會
+輸入 /help 查看詳細說明
+
+⚠️ 免責聲明：
+本分析僅供參考，投資有風險。
 """
         await update.message.reply_text(message)
         logger.info("✅ /start response sent successfully")
     except Exception as e:
         logger.error(f"❌ Error in /start: {e}", exc_info=True)
         try:
-            await update.message.reply_text("⚠️ Error processing command")
+            await update.message.reply_text("⚠️ 命令處理出錯")
         except:
             pass
 
@@ -139,18 +155,37 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Handle /help command."""
     logger.info("📍 /help command received")
     message = """
-📚 使用幫助
+📚 完整使用指南
 
-📊 股票掃描命令:
-• /tw_ma - 掃描台股 MA 回撤
-• /us_ma - 掃描美股 MA 回撤
+━━━━━━━━━━━━━━━━━━━━━━
 
-💡 MA 回撤是什麼?
-移動平均線短期回撤，但仍保持中期上升趨勢的股票。
-這通常被視為買點。
+📊 基礎掃描命令：
+  🇹🇼 /tw_ma - 台股 MA 回撤五日掃描
+  🇺🇸 /us_ma - 美股 MA 回撤五日掃描
 
-⚠️ 免責聲明:
+📈 進階分析命令：
+  📊 /week_ma - 週線 MA 分析
+  📋 /history - 過去七天股價記錄
+  📈 /chart - 股價走勢圖表
+
+❓ /help - 查看本幫助信息
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+💡 什麼是 MA 回撤？
+移動平均線短期回撤，但仍保持中期上升趨勢。
+這通常被視為良好買點。
+
+📊 如何解讀結果？
+• 現價：目前股票價格
+• MA5、MA10、MA20：5日、10日、20日移動平均線
+• 支撐：近期低點（買入區域）
+• 壓力：近期高點（賣出區域）
+• 趨勢：看漲(BULLISH) 或 看跌(BEARISH)
+
+⚠️ 免責聲明：
 本分析僅供參考，不構成投資建議。
+投資有風險，請自行評估與決定。
 """
     await update.message.reply_text(message)
     logger.info("✅ /help response sent")
@@ -161,11 +196,11 @@ async def week_ma(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"📍 /week_ma command from {update.effective_user.id}")
 
     try:
-        await update.message.reply_text("📊 正在分析週線數據...")
+        await update.message.reply_text("📊 正在分析週線數據，請稍候...")
 
         # Analyze top Taiwan stocks
         stocks = ["2330.TW", "2454.TW", "3008.TW"]
-        message = "📊 台股週線分析\n" + "=" * 40 + "\n\n"
+        message = "📊 台股週線 MA 分析\n" + "━" * 40 + "\n\n"
 
         for ticker in stocks:
             result = analyzer.get_weekly_ma_analysis(ticker)
@@ -176,7 +211,7 @@ async def week_ma(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error(f"❌ Error in /week_ma: {e}", exc_info=True)
         try:
-            await update.message.reply_text(f"❌ 分析失敗: {str(e)[:100]}")
+            await update.message.reply_text(f"❌ 週線分析失敗：{str(e)[:100]}")
         except:
             pass
 
@@ -186,22 +221,22 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"📍 /history command from {update.effective_user.id}")
 
     try:
-        await update.message.reply_text("📋 正在獲取歷史數據...")
+        await update.message.reply_text("📋 正在獲取歷史股價數據，請稍候...")
 
         # Show history for top stocks
         stocks = ["2330.TW", "AAPL"]
-        message = "📋 最近7天股價記錄\n" + "=" * 40 + "\n\n"
+        message = "📋 最近七天股價記錄\n" + "━" * 40 + "\n\n"
 
         for ticker in stocks:
             result = analyzer.get_historical_data(ticker, days=7)
-            message += analyzer.format_historical_data(result) + "\n\n"
+            message += analyzer.format_historical_data(result) + "\n"
 
         await update.message.reply_text(message)
         logger.info("✅ /history completed successfully")
     except Exception as e:
         logger.error(f"❌ Error in /history: {e}", exc_info=True)
         try:
-            await update.message.reply_text(f"❌ 獲取失敗: {str(e)[:100]}")
+            await update.message.reply_text(f"❌ 歷史數據獲取失敗：{str(e)[:100]}")
         except:
             pass
 
@@ -212,26 +247,37 @@ async def chart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     try:
         message = """
-📈 股價走勢圖表
+📈 股價走勢圖表（30天）
 
-🔹 台股週線圖表
-  - TSM (台積電)
-  - 2454.TW (聯發科)
-  - 3008.TW (瑞昱)
+━━━━━━━━━━━━━━━━━━━━━━
 
-🔹 美股週線圖表
-  - AAPL (蘋果)
-  - MSFT (微軟)
-  - GOOGL (谷歌)
+🇹🇼 台股圖表：
+  🔹 2330.TW - 台積電（TSM）
+  🔹 2454.TW - 聯發科（MediaTek）
+  🔹 3008.TW - 瑞昱（Realtek）
 
-💡 提示: 市場開盤後將顯示實時圖表
+🇺🇸 美股圖表：
+  🔹 AAPL - 蘋果
+  🔹 MSFT - 微軟
+  🔹 GOOGL - 谷歌
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+💡 提示：
+市場開盤後將顯示實時圖表。
+週一到週五美股開盤時段可查看。
+
+📊 圖表包含：
+  • 30天股價走勢
+  • 開盤、收盤、高低價
+  • 移動平均線（MA5、MA20）
 """
         await update.message.reply_text(message)
         logger.info("✅ /chart completed successfully")
     except Exception as e:
         logger.error(f"❌ Error in /chart: {e}", exc_info=True)
         try:
-            await update.message.reply_text(f"❌ 生成失敗: {str(e)[:100]}")
+            await update.message.reply_text(f"❌ 圖表生成失敗：{str(e)[:100]}")
         except:
             pass
 
