@@ -53,8 +53,9 @@ logger.info("✅ Stock analyzer initialized")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command."""
-    logger.info("📍 /start command received")
-    message = """
+    try:
+        logger.info(f"📍 /start command from {update.effective_user.id}")
+        message = """
 👋 歡迎使用 MCP 股票分析 Bot!
 
 可用命令:
@@ -64,38 +65,74 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 例如: /tw_ma 或 /us_ma
 """
-    await update.message.reply_text(message)
-    logger.info("✅ /start response sent")
+        await update.message.reply_text(message)
+        logger.info("✅ /start response sent successfully")
+    except Exception as e:
+        logger.error(f"❌ Error in /start: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("⚠️ Error processing command")
+        except:
+            pass
 
 
 async def scan_tw_ma(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /tw_ma command."""
-    logger.info("📍 /tw_ma command received")
-    await update.message.reply_text("📊 正在掃描台股 MA 回撤機會，請稍候...")
+    logger.info(f"📍 /tw_ma command from user {update.effective_user.id}")
 
     try:
+        # Send "waiting" message
+        await update.message.reply_text("📊 正在掃描台股 MA 回撤機會，請稍候...")
+        logger.info("   Waiting message sent")
+
+        # Get analysis
+        logger.info("   Analyzing stocks...")
         results = analyzer.get_ma_crossover_stocks(market="tw", days=5)
+
+        # Format results
+        logger.info("   Formatting results...")
         message = analyzer.format_results(results)
+
+        # Send results
+        logger.info("   Sending results...")
         await update.message.reply_text(message)
-        logger.info("✅ /tw_ma response sent")
+        logger.info("✅ /tw_ma completed successfully")
+
     except Exception as e:
         logger.error(f"❌ Error in /tw_ma: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ 掃描失敗: {str(e)}")
+        try:
+            await update.message.reply_text(f"❌ 掃描失敗: {str(e)[:100]}")
+        except:
+            pass
 
 
 async def scan_us_ma(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /us_ma command."""
-    logger.info("📍 /us_ma command received")
-    await update.message.reply_text("📊 正在掃描美股 MA 回撤機會，請稍候...")
+    logger.info(f"📍 /us_ma command from user {update.effective_user.id}")
 
     try:
+        # Send "waiting" message
+        await update.message.reply_text("📊 正在掃描美股 MA 回撤機會，請稍候...")
+        logger.info("   Waiting message sent")
+
+        # Get analysis
+        logger.info("   Analyzing stocks...")
         results = analyzer.get_ma_crossover_stocks(market="us", days=5)
+
+        # Format results
+        logger.info("   Formatting results...")
         message = analyzer.format_results(results)
+
+        # Send results
+        logger.info("   Sending results...")
         await update.message.reply_text(message)
-        logger.info("✅ /us_ma response sent")
+        logger.info("✅ /us_ma completed successfully")
+
     except Exception as e:
         logger.error(f"❌ Error in /us_ma: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ 掃描失敗: {str(e)}")
+        try:
+            await update.message.reply_text(f"❌ 掃描失敗: {str(e)[:100]}")
+        except:
+            pass
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -141,10 +178,14 @@ async def main():
     app = Application.builder().token(bot_token).build()
 
     logger.info("📋 Adding command handlers...")
+
+    # Add handlers - order matters!
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("tw_ma", scan_tw_ma))
     app.add_handler(CommandHandler("us_ma", scan_us_ma))
     app.add_handler(CommandHandler("help", help_command))
+
+    # Add text handler AFTER command handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     logger.info("✅ All handlers registered")
