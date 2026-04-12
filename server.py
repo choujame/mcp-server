@@ -5,6 +5,7 @@ import logging
 import sys
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
+from telegram_manager import get_telegram_manager
 
 # Configure logging to write to stderr
 logging.basicConfig(
@@ -351,7 +352,7 @@ async def get_sec_filings(
     url = f"{FINANCIAL_DATASETS_API_BASE}/filings/?ticker={ticker}&limit={limit}"
     if filing_type:
         url += f"&filing_type={filing_type}"
- 
+
     # Call the API
     data = await make_request(url)
 
@@ -364,6 +365,53 @@ async def get_sec_filings(
 
     # Stringify the SEC filings
     return json.dumps(filings, indent=2)
+
+
+# Telegram Tools
+
+@mcp.tool()
+async def send_telegram_message(message: str, chat_id: str | None = None) -> str:
+    """Send a message via Telegram.
+
+    Args:
+        message: The message text to send
+        chat_id: Optional specific chat ID (uses default if not provided)
+
+    Returns:
+        Status of the message sending operation
+    """
+    telegram_manager = get_telegram_manager()
+    result = await telegram_manager.send_message(message, chat_id)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+async def send_financial_alert(alert_type: str, ticker: str, message: str) -> str:
+    """Send a financial alert via Telegram.
+
+    Args:
+        alert_type: Type of alert (price_change, news, earnings, etc.)
+        ticker: Stock ticker symbol (e.g. AAPL, GOOGL)
+        message: Alert message details
+
+    Returns:
+        Status of the alert sending operation
+    """
+    telegram_manager = get_telegram_manager()
+    result = await telegram_manager.send_alert(alert_type, ticker, message)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+async def get_telegram_bot_info() -> str:
+    """Get information about the connected Telegram bot.
+
+    Returns:
+        Information about the Telegram bot or error message
+    """
+    telegram_manager = get_telegram_manager()
+    result = await telegram_manager.get_bot_info()
+    return json.dumps(result, indent=2)
 
 if __name__ == "__main__":
     # Log server startup
