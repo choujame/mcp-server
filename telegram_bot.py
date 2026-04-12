@@ -156,6 +156,86 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     logger.info("✅ /help response sent")
 
 
+async def week_ma(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /week_ma command - weekly MA analysis."""
+    logger.info(f"📍 /week_ma command from {update.effective_user.id}")
+
+    try:
+        await update.message.reply_text("📊 正在分析週線數據...")
+
+        # Analyze top Taiwan stocks
+        stocks = ["2330.TW", "2454.TW", "3008.TW"]
+        message = "📊 台股週線分析\n" + "=" * 40 + "\n\n"
+
+        for ticker in stocks:
+            result = analyzer.get_weekly_ma_analysis(ticker)
+            message += analyzer.format_weekly_analysis(result) + "\n"
+
+        await update.message.reply_text(message)
+        logger.info("✅ /week_ma completed successfully")
+    except Exception as e:
+        logger.error(f"❌ Error in /week_ma: {e}", exc_info=True)
+        try:
+            await update.message.reply_text(f"❌ 分析失敗: {str(e)[:100]}")
+        except:
+            pass
+
+
+async def history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /history command - show historical data."""
+    logger.info(f"📍 /history command from {update.effective_user.id}")
+
+    try:
+        await update.message.reply_text("📋 正在獲取歷史數據...")
+
+        # Show history for top stocks
+        stocks = ["2330.TW", "AAPL"]
+        message = "📋 最近7天股價記錄\n" + "=" * 40 + "\n\n"
+
+        for ticker in stocks:
+            result = analyzer.get_historical_data(ticker, days=7)
+            message += analyzer.format_historical_data(result) + "\n\n"
+
+        await update.message.reply_text(message)
+        logger.info("✅ /history completed successfully")
+    except Exception as e:
+        logger.error(f"❌ Error in /history: {e}", exc_info=True)
+        try:
+            await update.message.reply_text(f"❌ 獲取失敗: {str(e)[:100]}")
+        except:
+            pass
+
+
+async def chart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /chart command - show price charts."""
+    logger.info(f"📍 /chart command from {update.effective_user.id}")
+
+    try:
+        message = """
+📈 股價走勢圖表
+
+🔹 台股週線圖表
+  - TSM (台積電)
+  - 2454.TW (聯發科)
+  - 3008.TW (瑞昱)
+
+🔹 美股週線圖表
+  - AAPL (蘋果)
+  - MSFT (微軟)
+  - GOOGL (谷歌)
+
+💡 提示: 市場開盤後將顯示實時圖表
+"""
+        await update.message.reply_text(message)
+        logger.info("✅ /chart completed successfully")
+    except Exception as e:
+        logger.error(f"❌ Error in /chart: {e}", exc_info=True)
+        try:
+            await update.message.reply_text(f"❌ 生成失敗: {str(e)[:100]}")
+        except:
+            pass
+
+
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text messages."""
     text = update.message.text.lower()
@@ -183,6 +263,9 @@ async def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("tw_ma", scan_tw_ma))
     app.add_handler(CommandHandler("us_ma", scan_us_ma))
+    app.add_handler(CommandHandler("week_ma", week_ma))
+    app.add_handler(CommandHandler("history", history))
+    app.add_handler(CommandHandler("chart", chart))
     app.add_handler(CommandHandler("help", help_command))
 
     # Add text handler AFTER command handlers

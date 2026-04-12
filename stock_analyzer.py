@@ -173,6 +173,104 @@ class StockAnalyzer:
 
         return message
 
+    def get_weekly_ma_analysis(self, ticker: str) -> dict:
+        """Get weekly MA analysis for a stock."""
+        try:
+            data = yf.download(ticker, period="60d", progress=False)
+
+            if len(data) < 20:
+                return {"error": f"Not enough data for {ticker}"}
+
+            # Calculate weekly data
+            weekly_data = data.resample("W").agg({
+                "Open": "first",
+                "High": "max",
+                "Low": "min",
+                "Close": "last",
+                "Volume": "sum"
+            })
+
+            # Calculate MAs
+            weekly_data["MA5W"] = weekly_data["Close"].rolling(window=5).mean()
+            weekly_data["MA10W"] = weekly_data["Close"].rolling(window=10).mean()
+
+            current_price = data["Close"].iloc[-1]
+            weekly_close = weekly_data["Close"].iloc[-1]
+            ma5w = weekly_data["MA5W"].iloc[-1]
+            ma10w = weekly_data["MA10W"].iloc[-1]
+
+            return {
+                "ticker": ticker,
+                "current_price": round(current_price, 2),
+                "weekly_close": round(weekly_close, 2),
+                "ma5w": round(ma5w, 2),
+                "ma10w": round(ma10w, 2),
+                "weeks_analyzed": len(weekly_data),
+                "trend": "BULLISH" if current_price > ma10w else "BEARISH"
+            }
+        except Exception as e:
+            logger.error(f"Error analyzing {ticker}: {e}")
+            return {"error": str(e)}
+
+    def get_historical_data(self, ticker: str, days: int = 7) -> dict:
+        """Get historical daily data for a stock."""
+        try:
+            data = yf.download(ticker, period=f"{days}d", progress=False)
+
+            if len(data) == 0:
+                return {"error": f"No data for {ticker}"}
+
+            prices = []
+            for date, row in data.iterrows():
+                prices.append({
+                    "date": date.strftime("%Y-%m-%d"),
+                    "open": round(row["Open"], 2),
+                    "close": round(row["Close"], 2),
+                    "high": round(row["High"], 2),
+                    "low": round(row["Low"], 2),
+                    "volume": int(row["Volume"])
+                })
+
+            return {
+                "ticker": ticker,
+                "days": len(prices),
+                "prices": prices,
+                "current_price": prices[-1]["close"] if prices else None
+            }
+        except Exception as e:
+            logger.error(f"Error getting historical data for {ticker}: {e}")
+            return {"error": str(e)}
+
+    def format_weekly_analysis(self, result: dict) -> str:
+        """Format weekly analysis for display."""
+        if "error" in result:
+            return f"❌ {result['error']}"
+
+        msg = f"📊 週分析 - {result['ticker']}\n"
+        msg += f"📈 現價: ${result['current_price']}\n"
+        msg += f"📅 週收: ${result['weekly_close']}\n"
+        msg += f"📊 MA5W: ${result['ma5w']}\n"
+        msg += f"📊 MA10W: ${result['ma10w']}\n"
+        msg += f"💡 趨勢: {result['trend']}\n"
+        msg += f"⏱️ 週數: {result['weeks_analyzed']}\n"
+
+        return msg
+
+    def format_historical_data(self, result: dict) -> str:
+        """Format historical data for display."""
+        if "error" in result:
+            return f"❌ {result['error']}"
+
+        msg = f"📋 {result['ticker']} 最近 {result['days']} 天\n"
+        msg += f"━" * 40 + "\n"
+
+        for price in result["prices"][-7:]:  # Show last 7
+            msg += f"📅 {price['date']}\n"
+            msg += f"   開: ${price['open']} | 收: ${price['close']}\n"
+            msg += f"   高: ${price['high']} | 低: ${price['low']}\n"
+
+        return msg
+
 
 # Global instance
 _analyzer = None
