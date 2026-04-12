@@ -19,6 +19,8 @@
 - `get_historical_stock_prices` - Get historical stock prices
 - `get_company_news` - Get news for a company
 - `get_sec_filings` - Get SEC filings for a company
+- `convert_document_to_markdown` - Convert documents to markdown (NEW - Markitdown integration)
+- `get_sec_filing_as_markdown` - Convert SEC filings to markdown (NEW - Markitdown integration)
 - `get_available_crypto_tickers` - Get available crypto tickers
 - `get_crypto_prices` - Get historical crypto prices
 - `get_historical_crypto_prices` - Get historical crypto prices
@@ -46,6 +48,19 @@
   - Parameters: `market` ("tw" or "us"), `days` (default: 5)
   - Automatically sends formatted results to Telegram
   - Includes: current price, MA values, support/resistance, trend
+
+### Document Conversion Tools (Markitdown Integration)
+- `convert_document_to_markdown` - Convert any document to markdown format
+  - Parameters: `file_path` (local path or URL)
+  - Supported formats: HTML, PDF, DOCX, PPTX, and more
+  - Returns: Markdown-formatted content
+  - Example: Convert SEC filings, financial reports, news articles
+
+- `get_sec_filing_as_markdown` - Convert SEC filing documents to markdown
+  - Parameters: `ticker`, `filing_url`, `limit` (max characters, default: 5000)
+  - Fetches HTML from SEC Edgar and converts to markdown
+  - Example: Convert 10-K, 10-Q, 8-K documents for analysis
+  - Returns: Markdown content with character limit applied
 
 ## Telegram Configuration
 
@@ -158,9 +173,17 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
 ## Features
 
-### 1️⃣ Markitdown Support
-- Installed: ✅
+### 1️⃣ Markitdown Support (NEW!)
+- Installed: ✅ In pyproject.toml dependencies
 - Purpose: Convert various file formats to Markdown
+- Tools:
+  - `convert_document_to_markdown` - Convert HTML, PDF, DOCX, PPTX to markdown
+  - `get_sec_filing_as_markdown` - Convert SEC filing documents to markdown
+- Use Cases:
+  - Convert SEC filings for analysis
+  - Convert financial reports to markdown
+  - Convert news articles and web pages
+  - Extract text from PDF documents
 
 ### 2️⃣ Telegram Bot Integration
 - Status: ✅ Configured
@@ -263,6 +286,39 @@ or:    "找台股買點信號"
 
 Bot:   📊 Analysis results...
 ```
+
+### 6. Convert Documents to Markdown (via Claude)
+
+**Example 1: Convert SEC filing to markdown**
+```
+Claude: "Convert the Apple 10-K filing from this URL to markdown"
+
+Tool: get_sec_filing_as_markdown(
+  ticker="AAPL",
+  filing_url="https://www.sec.gov/Archives/edgar/...",
+  limit=5000
+)
+
+Result: Markdown-formatted SEC filing content
+```
+
+**Example 2: Convert HTML document to markdown**
+```
+Claude: "Convert this financial news article to markdown"
+
+Tool: convert_document_to_markdown(
+  file_path="https://example.com/financial-report.html"
+)
+
+Result: Clean markdown text extracted from HTML
+```
+
+**Supported Formats:**
+- HTML files and web pages
+- PDF documents
+- Microsoft Word (DOCX)
+- PowerPoint presentations (PPTX)
+- And more!
 
 ## Environment Variables
 
