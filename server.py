@@ -8,6 +8,12 @@ from dotenv import load_dotenv
 from telegram_manager import get_telegram_manager
 from stock_analyzer import get_stock_analyzer
 
+try:
+    from markitdown import MarkItDown
+    MARKITDOWN_AVAILABLE = True
+except ImportError:
+    MARKITDOWN_AVAILABLE = False
+
 # Configure logging to write to stderr
 logging.basicConfig(
     level=logging.INFO,
@@ -460,6 +466,115 @@ async def get_ma_pullback_telegram(market: str = "tw", days: int = 5) -> str:
         "status": send_result,
         "message_sent": message[:100] + "..." if len(message) > 100 else message
     }, indent=2)
+
+
+# Document Conversion Tools
+
+@mcp.tool()
+async def convert_document_to_markdown(file_path: str) -> str:
+    """Convert a document to markdown format using Markitdown.
+
+    Supports HTML, PDF, DOCX, PPTX, and many other file formats.
+
+    Args:
+        file_path: Path to the file to convert (local file path or URL)
+
+    Returns:
+        The document converted to markdown format
+    """
+    if not MARKITDOWN_AVAILABLE:
+        return json.dumps({
+            "error": "Markitdown is not installed. Install with: pip install markitdown"
+        }, indent=2)
+
+    try:
+        # Initialize MarkItDown converter
+        md = MarkItDown()
+
+        # Check if it's a URL or local file
+        if file_path.startswith('http://') or file_path.startswith('https://'):
+            # Download the file from URL
+            async with httpx.AsyncClient() as client:
+                response = await client.get(file_path, timeout=30.0)
+                response.raise_for_status()
+                content = response.content
+
+            # Convert the content to markdown
+            result = md.convert_stream(
+                stream=__import__('io').BytesIO(content),
+                file_extension=file_path.split('.')[-1]
+            )
+        else:
+            # Convert local file
+            result = md.convert(file_path)
+
+        return json.dumps({
+            "success": True,
+            "markdown_content": result.text_content,
+            "source": file_path
+        }, indent=2)
+
+    except Exception as e:
+        logger.error(f"Error converting document: {e}")
+        return json.dumps({
+            "error": f"Failed to convert document: {str(e)}",
+            "file_path": file_path
+        }, indent=2)
+
+
+@mcp.tool()
+async def get_sec_filing_as_markdown(
+    ticker: str,
+    filing_url: str,
+    limit: int = 5000
+) -> str:
+    """Fetch a SEC filing document and convert it to markdown.
+
+    This tool fetches the HTML content from a SEC filing URL and converts it
+    to markdown format for easier analysis and processing.
+
+    Args:
+        ticker: Stock ticker symbol (e.g., AAPL)
+        filing_url: Full URL to the SEC filing document (e.g., from SEC Edgar)
+        limit: Maximum characters to return (default: 5000)
+
+    Returns:
+        The SEC filing content converted to markdown
+    """
+    if not MARKITDOWN_AVAILABLE:
+        return json.dumps({
+            "error": "Markitdown is not installed. Install with: pip install markitdown"
+        }, indent=2)
+
+    try:
+        # Use the general document converter
+        result = await convert_document_to_markdown(filing_url)
+        result_data = json.loads(result)
+
+        if "error" in result_data:
+            return result
+
+        # Truncate to limit
+        markdown_content = result_data.get("markdown_content", "")
+        if len(markdown_content) > limit:
+            markdown_content = markdown_content[:limit] + f"\n\n[... content truncated at {limit} characters]"
+
+        return json.dumps({
+            "success": True,
+            "ticker": ticker,
+            "markdown_content": markdown_content,
+            "source": filing_url,
+            "character_limit": limit
+        }, indent=2)
+
+    except Exception as e:
+        logger.error(f"Error converting SEC filing: {e}")
+        return json.dumps({
+            "error": f"Failed to convert SEC filing: {str(e)}",
+            "ticker": ticker,
+            "filing_url": filing_url
+        }, indent=2)
+
 
 if __name__ == "__main__":
     # Log server startup
