@@ -108,16 +108,22 @@ class TelegramBotHandler:
             logger.error("TELEGRAM_BOT_TOKEN not configured")
             return
 
+        logger.info("Creating Telegram Application...")
         self.app = Application.builder().token(self.bot_token).build()
 
-        # Add handlers
+        # Add handlers in order of specificity
+        logger.info("Registering command handlers...")
         self.app.add_handler(CommandHandler("start", self.start))
         self.app.add_handler(CommandHandler("tw_ma", self.scan_tw_ma))
         self.app.add_handler(CommandHandler("us_ma", self.scan_us_ma))
         self.app.add_handler(CommandHandler("help", self.help_command))
+
+        # Message handler for any text that's not a command
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
 
-        logger.info("Telegram bot handler initialized")
+        logger.info("✅ Telegram bot handler initialized successfully")
+        logger.info(f"✅ Bot Token configured: {self.bot_token[:20]}...")
+        logger.info(f"✅ Chat ID configured: {self.chat_id}")
 
     async def run(self) -> None:
         """Run the bot with polling."""

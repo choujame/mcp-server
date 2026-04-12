@@ -10,9 +10,9 @@ This script runs both:
 import asyncio
 import logging
 import sys
-from concurrent.futures import ThreadPoolExecutor
-import server
-from telegram_bot_handler import run_telegram_bot
+import signal
+from server import mcp
+from telegram_bot_handler import get_telegram_bot_handler
 
 # Configure logging
 logging.basicConfig(
@@ -22,36 +22,61 @@ logging.basicConfig(
 )
 logger = logging.getLogger("main")
 
+# Global reference for cleanup
+bot_handler = None
+
+
+async def start_telegram_bot():
+    """Start the Telegram bot in polling mode."""
+    global bot_handler
+    try:
+        logger.info("Initializing Telegram bot handler...")
+        bot_handler = get_telegram_bot_handler()
+        await bot_handler.initialize()
+        logger.info("Telegram bot handler initialized, starting polling...")
+        await bot_handler.run()
+    except Exception as e:
+        logger.error(f"Telegram bot error: {e}", exc_info=True)
+
 
 def run_mcp_server():
     """Run the MCP server in stdio mode."""
-    logger.info("Starting MCP server...")
-    server.mcp.run(transport="stdio")
-
-
-async def run_services():
-    """Run both MCP server and Telegram bot concurrently."""
-    # Run Telegram bot in a thread pool
-    loop = asyncio.get_event_loop()
-    executor = ThreadPoolExecutor(max_workers=1)
-
-    # Start Telegram bot in background
-    try:
-        await run_telegram_bot()
-    except Exception as e:
-        logger.error(f"Telegram bot error: {e}")
+    logger.info("Starting MCP server on stdio transport...")
+    mcp.run(transport="stdio")
 
 
 if __name__ == "__main__":
     import threading
 
-    logger.info("Initializing services...")
+    logger.info("=" * 60)
+    logger.info("Starting MCP Server with Telegram Bot Support")
+    logger.info("=" * 60)
 
-    # Start Telegram bot in a separate thread
-    telegram_thread = threading.Thread(target=lambda: asyncio.run(run_services()), daemon=True)
+    # Create and start Telegram bot thread
+    def run_telegram():
+        try:
+            asyncio.run(start_telegram_bot())
+        except KeyboardInterrupt:
+            logger.info("Telegram bot interrupted")
+        except Exception as e:
+            logger.error(f"Telegram bot fatal error: {e}", exc_info=True)
+
+    telegram_thread = threading.Thread(target=run_telegram, daemon=True, name="TelegramBot")
     telegram_thread.start()
-    logger.info("Telegram bot handler started in background")
+    logger.info("✅ Telegram bot thread started")
 
-    # Run MCP server in main thread
-    logger.info("Starting MCP server on stdio...")
-    run_mcp_server()
+    # Small delay to let Telegram bot initialize
+    import time
+    time.sleep(2)
+
+    # Run MCP server in main thread (blocks until interrupted)
+    logger.info("✅ MCP server starting on stdio...")
+    try:
+        run_mcp_server()
+    except KeyboardInterrupt:
+        logger.info("MCP server interrupted")
+    except Exception as e:
+        logger.error(f"MCP server error: {e}", exc_info=True)
+    finally:
+        logger.info("Shutdown complete")
+
