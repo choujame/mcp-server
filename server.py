@@ -6,6 +6,7 @@ import sys
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 from telegram_manager import get_telegram_manager
+from stock_analyzer import get_stock_analyzer
 
 # Configure logging to write to stderr
 logging.basicConfig(
@@ -412,6 +413,53 @@ async def get_telegram_bot_info() -> str:
     telegram_manager = get_telegram_manager()
     result = await telegram_manager.get_bot_info()
     return json.dumps(result, indent=2)
+
+
+# Stock Screening Tools
+
+@mcp.tool()
+async def scan_ma_pullback_stocks(market: str = "tw", days: int = 5) -> str:
+    """Scan stocks for moving average pullback patterns.
+
+    Args:
+        market: "tw" for Taiwan stocks (台股) or "us" for US stocks (美股)
+        days: Number of days to check for pullback (default: 5)
+
+    Returns:
+        List of stocks with MA pullback opportunities
+    """
+    analyzer = get_stock_analyzer()
+    results = analyzer.get_ma_crossover_stocks(market=market, days=days)
+    return json.dumps(results, indent=2)
+
+
+@mcp.tool()
+async def get_ma_pullback_telegram(market: str = "tw", days: int = 5) -> str:
+    """Scan MA pullback stocks and send formatted results to Telegram.
+
+    Args:
+        market: "tw" for Taiwan stocks or "us" for US stocks
+        days: Number of days for pullback detection (default: 5)
+
+    Returns:
+        Status of the message sending
+    """
+    analyzer = get_stock_analyzer()
+    telegram_manager = get_telegram_manager()
+
+    # Get analysis results
+    results = analyzer.get_ma_crossover_stocks(market=market, days=days)
+
+    # Format for Telegram
+    message = analyzer.format_results(results)
+
+    # Send to Telegram
+    send_result = await telegram_manager.send_message(message)
+
+    return json.dumps({
+        "status": send_result,
+        "message_sent": message[:100] + "..." if len(message) > 100 else message
+    }, indent=2)
 
 if __name__ == "__main__":
     # Log server startup
