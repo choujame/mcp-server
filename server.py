@@ -365,12 +365,169 @@ async def get_sec_filings(
     # Stringify the SEC filings
     return json.dumps(filings, indent=2)
 
+ARTICLE_TOOLS_BASE = "https://eternityspring.github.io/article-tools"
+
+
+@mcp.tool()
+def get_article_tool_url(tool: str) -> str:
+    """Get the URL for an article formatting tool.
+
+    Args:
+        tool: The tool name. One of: 'cover', 'md-to-wechat', 'md-to-x', 'qrcode', 'index'.
+    """
+    valid_tools = {"cover", "md-to-wechat", "md-to-x", "qrcode", "index"}
+    if tool not in valid_tools:
+        return f"Unknown tool '{tool}'. Valid options: {', '.join(sorted(valid_tools))}"
+    if tool == "index":
+        return ARTICLE_TOOLS_BASE + "/"
+    return f"{ARTICLE_TOOLS_BASE}/{tool}.html"
+
+
+@mcp.tool()
+def format_markdown_for_wechat(content: str) -> str:
+    """Convert markdown content to WeChat public account compatible HTML format.
+
+    Args:
+        content: Markdown text to convert.
+    """
+    import re
+
+    lines = content.split("\n")
+    output = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        # Headers
+        m = re.match(r"^(#{1,6})\s+(.*)", line)
+        if m:
+            level = len(m.group(1))
+            text = m.group(2).strip()
+            size = {1: "24px", 2: "20px", 3: "18px", 4: "16px", 5: "15px", 6: "14px"}[level]
+            output.append(f'<p style="font-size:{size};font-weight:bold;margin:16px 0 8px;">{text}</p>')
+            i += 1
+            continue
+
+        # Blank line → paragraph break
+        if line.strip() == "":
+            i += 1
+            continue
+
+        # Unordered list item
+        m = re.match(r"^[-*+]\s+(.*)", line)
+        if m:
+            output.append(f'<p style="margin:4px 0;">• {_inline_md(m.group(1))}</p>')
+            i += 1
+            continue
+
+        # Ordered list item
+        m = re.match(r"^\d+\.\s+(.*)", line)
+        if m:
+            output.append(f'<p style="margin:4px 0;">{_inline_md(m.group(0))}</p>')
+            i += 1
+            continue
+
+        # Regular paragraph
+        output.append(f'<p style="margin:8px 0;line-height:1.75;">{_inline_md(line)}</p>')
+        i += 1
+
+    return "\n".join(output)
+
+
+def _inline_md(text: str) -> str:
+    """Convert inline markdown (bold, italic, code, links) to HTML."""
+    import re
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"__(.+?)__", r"<strong>\1</strong>", text)
+    text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
+    text = re.sub(r"_(.+?)_", r"<em>\1</em>", text)
+    text = re.sub(r"`(.+?)`", r'<code style="background:#f4f4f4;padding:2px 4px;">\1</code>', text)
+    text = re.sub(r"\[(.+?)\]\((.+?)\)", r'<a href="\2">\1</a>', text)
+    return text
+
+
+@mcp.tool()
+def format_markdown_for_x(content: str, max_chars: int = 270) -> str:
+    """Split and format content into an X (Twitter) thread.
+
+    Each post in the thread is kept under max_chars. The thread is returned as
+    numbered posts separated by '---'.
+
+    Args:
+        content: The text or markdown content to format.
+        max_chars: Maximum characters per post (default 270, leaving room for numbering).
+    """
+    import re
+
+    # Strip markdown syntax to plain text
+    text = re.sub(r"#{1,6}\s+", "", content)
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+    text = re.sub(r"_(.+?)_", r"\1", text)
+    text = re.sub(r"`(.+?)`", r"\1", text)
+    text = re.sub(r"\[(.+?)\]\(.+?\)", r"\1", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+    # Split into sentences
+    sentences = re.split(r"(?<=[。！？.!?])\s*", text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    posts = []
+    current = ""
+    for sentence in sentences:
+        if len(current) + len(sentence) + 1 <= max_chars:
+            current = (current + " " + sentence).strip()
+        else:
+            if current:
+                posts.append(current)
+            if len(sentence) > max_chars:
+                # Hard-split long sentence
+                for j in range(0, len(sentence), max_chars):
+                    posts.append(sentence[j:j + max_chars])
+                current = ""
+            else:
+                current = sentence
+    if current:
+        posts.append(current)
+
+    total = len(posts)
+    numbered = [f"[{idx + 1}/{total}] {post}" for idx, post in enumerate(posts)]
+    return "\n---\n".join(numbered)
+
+
+@mcp.tool()
+def generate_article_cover_config(
+    title: str,
+    subtitle: str = "",
+    author: str = "",
+    bg_color: str = "#ffffff",
+    text_color: str = "#333333",
+) -> str:
+    """Generate a JSON configuration for an article cover image.
+
+    Returns a JSON object that can be used with the article-tools cover generator
+    at https://eternityspring.github.io/article-tools/cover.html
+
+    Args:
+        title: Main article title.
+        subtitle: Optional subtitle or description.
+        author: Author name.
+        bg_color: Background color hex code (default #ffffff).
+        text_color: Text color hex code (default #333333).
+    """
+    config = {
+        "title": title,
+        "subtitle": subtitle,
+        "author": author,
+        "bgColor": bg_color,
+        "textColor": text_color,
+        "toolUrl": f"{ARTICLE_TOOLS_BASE}/cover.html",
+    }
+    return json.dumps(config, ensure_ascii=False, indent=2)
+
+
 if __name__ == "__main__":
-    # Log server startup
     logger.info("Starting Financial Datasets MCP Server...")
-
-    # Initialize and run the server
     mcp.run(transport="stdio")
-
-    # This line won't be reached during normal operation
     logger.info("Server stopped")
