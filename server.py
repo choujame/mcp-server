@@ -1,8 +1,12 @@
 import json
 import os
+import re
+import shutil
 import httpx
 import logging
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
@@ -364,6 +368,358 @@ async def get_sec_filings(
 
     # Stringify the SEC filings
     return json.dumps(filings, indent=2)
+
+# ---------------------------------------------------------------------------
+# Obsidian Knowledge Base Tools (Karpathy-style)
+# ---------------------------------------------------------------------------
+
+def _resolve_vault(vault_path: str) -> Path:
+    """Return a validated absolute Path for the vault, loading from env if needed."""
+    load_dotenv()
+    vp = vault_path.strip() or os.environ.get("OBSIDIAN_VAULT_PATH", "").strip()
+    if not vp:
+        raise ValueError(
+            "vault_path is required. Pass it directly or set OBSIDIAN_VAULT_PATH in .env"
+        )
+    p = Path(vp).expanduser().resolve()
+    if not p.exists():
+        raise FileNotFoundError(f"Vault directory not found: {p}")
+    if not p.is_dir():
+        raise NotADirectoryError(f"Vault path is not a directory: {p}")
+    return p
+
+
+def _safe_child(parent: Path, name: str) -> Path:
+    """Resolve a child path and ensure it stays inside parent (no path traversal)."""
+    child = (parent / name).resolve()
+    if not str(child).startswith(str(parent)):
+        raise ValueError(f"Path traversal detected: {name!r}")
+    return child
+
+
+def _slugify(title: str) -> str:
+    slug = re.sub(r"[^\w\s-]", "", title.lower())
+    slug = re.sub(r"[\s_]+", "-", slug).strip("-")
+    return slug or "untitled"
+
+
+def _today() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+@mcp.tool()
+async def setup_vault_structure(vault_path: str = "") -> str:
+    """Set up the Karpathy-style knowledge base structure inside an Obsidian vault.
+
+    Creates:
+      - raw/        — drop zone for clipped articles / raw notes
+      - wiki/       — AI-processed, structured knowledge entries
+      - index.md    — auto-maintained table of contents
+      - log.md      — append-only activity log
+
+    Args:
+        vault_path: Absolute path to the Obsidian vault folder.
+                    Falls back to the OBSIDIAN_VAULT_PATH environment variable.
+    """
+    vault = _resolve_vault(vault_path)
+    created = []
+
+    for folder in ("raw", "wiki", "raw/processed"):
+        d = vault / folder
+        if not d.exists():
+            d.mkdir(parents=True)
+            created.append(f"  created  {folder}/")
+        else:
+            created.append(f"  exists   {folder}/")
+
+    index_path = vault / "index.md"
+    if not index_path.exists():
+        index_path.write_text(
+            "# Knowledge Base Index\n\n"
+            "> Auto-maintained by Claude Code\n\n"
+            "## Wiki Entries\n\n"
+            "_No entries yet. Run `update_index` after adding wiki pages._\n",
+            encoding="utf-8",
+        )
+        created.append("  created  index.md")
+    else:
+        created.append("  exists   index.md")
+
+    log_path = vault / "log.md"
+    if not log_path.exists():
+        log_path.write_text(
+            "# Knowledge Base Log\n\n"
+            "> Append-only activity log — do not edit manually.\n\n",
+            encoding="utf-8",
+        )
+        created.append("  created  log.md")
+    else:
+        created.append("  exists   log.md")
+
+    report = "\n".join(created)
+    return f"Vault structure ready at {vault}\n\n{report}"
+
+
+@mcp.tool()
+async def list_raw_files(vault_path: str = "") -> str:
+    """List unprocessed files waiting in raw/.
+
+    Args:
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    raw_dir = vault / "raw"
+    if not raw_dir.exists():
+        return "raw/ directory does not exist. Run setup_vault_structure first."
+
+    files = sorted(
+        f.name for f in raw_dir.iterdir()
+        if f.is_file() and not f.name.startswith(".")
+    )
+    if not files:
+        return "raw/ is empty — nothing to process."
+    return json.dumps({"count": len(files), "files": files}, indent=2)
+
+
+@mcp.tool()
+async def read_raw_file(filename: str, vault_path: str = "") -> str:
+    """Read the contents of a file from raw/.
+
+    Args:
+        filename: File name relative to raw/ (e.g. "article.md").
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    path = _safe_child(vault / "raw", filename)
+    if not path.exists():
+        return f"File not found: raw/{filename}"
+    return path.read_text(encoding="utf-8")
+
+
+@mcp.tool()
+async def create_wiki_entry(
+    title: str,
+    content: str,
+    tags: list[str] | None = None,
+    vault_path: str = "",
+) -> str:
+    """Create (or overwrite) a processed wiki entry in wiki/.
+
+    The file is written as Markdown with YAML front-matter containing title,
+    date, and tags so Obsidian can index it.
+
+    Args:
+        title:      Human-readable title of the entry.
+        content:    Markdown body of the entry (without front-matter).
+        tags:       Optional list of tag strings.
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    wiki_dir = vault / "wiki"
+    wiki_dir.mkdir(exist_ok=True)
+
+    slug = _slugify(title)
+    filename = f"{slug}.md"
+    path = _safe_child(wiki_dir, filename)
+
+    tag_list = tags or []
+    tag_yaml = json.dumps(tag_list)  # compact JSON array is valid YAML
+
+    frontmatter = (
+        f"---\n"
+        f'title: "{title}"\n'
+        f"date: {_today()}\n"
+        f"tags: {tag_yaml}\n"
+        f"---\n\n"
+    )
+    path.write_text(frontmatter + content.strip() + "\n", encoding="utf-8")
+    return f"Wiki entry written: wiki/{filename}"
+
+
+@mcp.tool()
+async def list_wiki_entries(vault_path: str = "") -> str:
+    """List all entries in wiki/.
+
+    Args:
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    wiki_dir = vault / "wiki"
+    if not wiki_dir.exists():
+        return "wiki/ directory does not exist. Run setup_vault_structure first."
+
+    entries = []
+    for f in sorted(wiki_dir.iterdir()):
+        if f.is_file() and f.suffix == ".md" and not f.name.startswith("."):
+            entries.append({"filename": f.name, "size_bytes": f.stat().st_size})
+
+    if not entries:
+        return "wiki/ is empty — no entries yet."
+    return json.dumps({"count": len(entries), "entries": entries}, indent=2)
+
+
+@mcp.tool()
+async def read_wiki_entry(filename: str, vault_path: str = "") -> str:
+    """Read a wiki entry from wiki/.
+
+    Args:
+        filename:   File name relative to wiki/ (e.g. "machine-learning.md").
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    path = _safe_child(vault / "wiki", filename)
+    if not path.exists():
+        return f"File not found: wiki/{filename}"
+    return path.read_text(encoding="utf-8")
+
+
+@mcp.tool()
+async def update_index(vault_path: str = "") -> str:
+    """Regenerate index.md from the current contents of wiki/.
+
+    Scans wiki/ for Markdown files, reads their front-matter title and tags,
+    then rewrites index.md with a sorted alphabetical table of contents.
+
+    Args:
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    wiki_dir = vault / "wiki"
+    if not wiki_dir.exists():
+        return "wiki/ directory does not exist. Run setup_vault_structure first."
+
+    entries = []
+    frontmatter_re = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
+    title_re = re.compile(r'^title:\s*"?([^"\n]+)"?', re.MULTILINE)
+    tags_re = re.compile(r'^tags:\s*(\[.*?\])', re.MULTILINE)
+
+    for f in sorted(wiki_dir.iterdir()):
+        if not (f.is_file() and f.suffix == ".md" and not f.name.startswith(".")):
+            continue
+        text = f.read_text(encoding="utf-8")
+        fm_match = frontmatter_re.match(text)
+        fm = fm_match.group(1) if fm_match else ""
+
+        title_match = title_re.search(fm)
+        title = title_match.group(1).strip() if title_match else f.stem
+
+        tags_match = tags_re.search(fm)
+        try:
+            tags = json.loads(tags_match.group(1)) if tags_match else []
+        except Exception:
+            tags = []
+
+        tag_str = " ".join(f"`{t}`" for t in tags) if tags else ""
+        entries.append((title, f.name, tag_str))
+
+    lines = [
+        "# Knowledge Base Index\n",
+        "> Auto-maintained by Claude Code\n",
+        f"\n_Last updated: {_today()} — {len(entries)} entries_\n",
+        "\n## Wiki Entries\n",
+    ]
+    if entries:
+        lines.append("| Title | Tags |\n|-------|------|\n")
+        for title, fname, tag_str in entries:
+            lines.append(f"| [[wiki/{fname}\\|{title}]] | {tag_str} |\n")
+    else:
+        lines.append("_No entries yet._\n")
+
+    (vault / "index.md").write_text("".join(lines), encoding="utf-8")
+    return f"index.md updated with {len(entries)} entries."
+
+
+@mcp.tool()
+async def append_log(entry: str, vault_path: str = "") -> str:
+    """Append a timestamped entry to log.md.
+
+    Args:
+        entry:      The text to record (one or more lines).
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    log_path = vault / "log.md"
+    if not log_path.exists():
+        log_path.write_text(
+            "# Knowledge Base Log\n\n"
+            "> Append-only activity log — do not edit manually.\n\n",
+            encoding="utf-8",
+        )
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    block = f"\n### {now}\n\n{entry.strip()}\n"
+    with log_path.open("a", encoding="utf-8") as fh:
+        fh.write(block)
+    return f"Log entry appended at {now}."
+
+
+@mcp.tool()
+async def archive_raw_file(filename: str, vault_path: str = "") -> str:
+    """Move a processed file from raw/ to raw/processed/.
+
+    Call this after you have created a wiki entry from a raw file so the
+    source is preserved but no longer appears in the unprocessed queue.
+
+    Args:
+        filename:   File name relative to raw/ (e.g. "article.md").
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    src = _safe_child(vault / "raw", filename)
+    if not src.exists():
+        return f"File not found: raw/{filename}"
+
+    dest_dir = vault / "raw" / "processed"
+    dest_dir.mkdir(exist_ok=True)
+    dest = _safe_child(dest_dir, filename)
+
+    # Avoid silent overwrites by appending a timestamp suffix
+    if dest.exists():
+        stem, suffix = dest.stem, dest.suffix
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        dest = dest_dir / f"{stem}-{ts}{suffix}"
+
+    shutil.move(str(src), str(dest))
+    return f"Archived: raw/{filename} → raw/processed/{dest.name}"
+
+
+@mcp.tool()
+async def search_knowledge_base(query: str, vault_path: str = "") -> str:
+    """Case-insensitive text search across all notes in raw/ and wiki/.
+
+    Returns file paths and the matching lines with surrounding context.
+
+    Args:
+        query:      Search string (plain text, case-insensitive).
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    pattern = re.compile(re.escape(query), re.IGNORECASE)
+    results = []
+
+    for subdir in ("raw", "wiki"):
+        d = vault / subdir
+        if not d.exists():
+            continue
+        for f in sorted(d.rglob("*.md")):
+            if f.name.startswith("."):
+                continue
+            lines = f.read_text(encoding="utf-8").splitlines()
+            hits = []
+            for i, line in enumerate(lines):
+                if pattern.search(line):
+                    start = max(0, i - 1)
+                    end = min(len(lines), i + 2)
+                    ctx = lines[start:end]
+                    hits.append({"line": i + 1, "context": "\n".join(ctx)})
+            if hits:
+                rel = str(f.relative_to(vault))
+                results.append({"file": rel, "matches": hits})
+
+    if not results:
+        return f"No results found for: {query!r}"
+    return json.dumps({"query": query, "total_files": len(results), "results": results}, indent=2)
+
 
 if __name__ == "__main__":
     # Log server startup
