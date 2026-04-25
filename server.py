@@ -582,6 +582,41 @@ def generate_article_cover_config(
     return json.dumps(config, ensure_ascii=False, indent=2)
 
 
+@mcp.tool()
+async def generate_qrcode(
+    content: str,
+    size: int = 300,
+    format: str = "png",
+) -> str:
+    """Generate a QR code for the given text or URL.
+
+    Returns a direct image URL that can be opened in a browser or embedded in
+    articles. Uses the free api.qrserver.com service.
+
+    Args:
+        content: Text or URL to encode in the QR code.
+        size: Image size in pixels (width × height), default 300.
+        format: Image format, either 'png' or 'svg' (default 'png').
+    """
+    import urllib.parse
+
+    if format not in ("png", "svg"):
+        format = "png"
+    size = max(100, min(1000, size))
+    encoded = urllib.parse.quote(content)
+    url = (
+        f"https://api.qrserver.com/v1/create-qr-code/"
+        f"?data={encoded}&size={size}x{size}&format={format}"
+    )
+    result = {
+        "qrcode_url": url,
+        "content": content,
+        "size": size,
+        "format": format,
+    }
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
 if __name__ == "__main__":
     logger.info("Starting Financial Datasets MCP Server...")
     mcp.run(transport="stdio")
