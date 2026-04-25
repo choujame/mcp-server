@@ -497,6 +497,61 @@ def format_markdown_for_x(content: str, max_chars: int = 270) -> str:
 
 
 @mcp.tool()
+def format_markdown_for_threads(content: str, max_chars: int = 500) -> str:
+    """Split and format content into a Threads thread.
+
+    Each post is kept under max_chars (Threads limit is 500). Posts are
+    separated by a blank line. Non-final posts end with 👇 to signal continuation.
+
+    Args:
+        content: The text or markdown content to format.
+        max_chars: Maximum characters per post (default 500).
+    """
+    import re
+
+    # Strip markdown to plain text
+    text = re.sub(r"#{1,6}\s+", "", content)
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+    text = re.sub(r"_(.+?)_", r"\1", text)
+    text = re.sub(r"`(.+?)`", r"\1", text)
+    text = re.sub(r"\[(.+?)\]\(.+?\)", r"\1", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+    # Split into sentences
+    sentences = re.split(r"(?<=[。！？.!?])\s*", text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    # Pack sentences into posts within max_chars (reserve 2 chars for 👇)
+    limit = max_chars - 2
+    posts, current = [], ""
+    for sentence in sentences:
+        if len(current) + len(sentence) + 1 <= limit:
+            current = (current + "\n" + sentence).strip()
+        else:
+            if current:
+                posts.append(current)
+            if len(sentence) > limit:
+                for j in range(0, len(sentence), limit):
+                    posts.append(sentence[j:j + limit])
+                current = ""
+            else:
+                current = sentence
+    if current:
+        posts.append(current)
+
+    result = []
+    for i, post in enumerate(posts):
+        if i < len(posts) - 1:
+            result.append(post + "\n👇")
+        else:
+            result.append(post)
+
+    return "\n\n".join(result)
+
+
+@mcp.tool()
 def generate_article_cover_config(
     title: str,
     subtitle: str = "",
