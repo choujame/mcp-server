@@ -21,6 +21,12 @@ mcp = FastMCP("financial-datasets")
 FINANCIAL_DATASETS_API_BASE = "https://api.financialdatasets.ai"
 
 
+def _safe_json(data: any, fallback: str) -> str:
+    """Return json.dumps result, or fallback if result would be empty."""
+    result = json.dumps(data, indent=2)
+    return result if result.strip() else fallback
+
+
 # Helper function to make API requests
 async def make_request(url: str) -> dict[str, any] | None:
     """Make a request to the Financial Datasets API with proper error handling."""
@@ -35,9 +41,12 @@ async def make_request(url: str) -> dict[str, any] | None:
         try:
             response = await client.get(url, headers=headers, timeout=30.0)
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            if result is None:
+                return {"Error": "API returned an empty response"}
+            return result
         except Exception as e:
-            return {"Error": str(e)}
+            return {"Error": str(e) or "Unknown error occurred"}
 
 
 @mcp.tool()
@@ -69,7 +78,7 @@ async def get_income_statements(
         return "Unable to fetch income statements or no income statements found."
 
     # Stringify the income statements
-    return json.dumps(income_statements, indent=2)
+    return _safe_json(income_statements, "Unable to fetch income statements or no income statements found.")
 
 
 @mcp.tool()
@@ -101,7 +110,7 @@ async def get_balance_sheets(
         return "Unable to fetch balance sheets or no balance sheets found."
 
     # Stringify the balance sheets
-    return json.dumps(balance_sheets, indent=2)
+    return _safe_json(balance_sheets, "Unable to fetch balance sheets or no balance sheets found.")
 
 
 @mcp.tool()
@@ -133,7 +142,7 @@ async def get_cash_flow_statements(
         return "Unable to fetch cash flow statements or no cash flow statements found."
 
     # Stringify the cash flow statements
-    return json.dumps(cash_flow_statements, indent=2)
+    return _safe_json(cash_flow_statements, "Unable to fetch cash flow statements or no cash flow statements found.")
 
 
 @mcp.tool()
@@ -159,7 +168,7 @@ async def get_current_stock_price(ticker: str) -> str:
         return "Unable to fetch current price or no current price found."
 
     # Stringify the current price
-    return json.dumps(snapshot, indent=2)
+    return _safe_json(snapshot, "Unable to fetch current price or no current price found.")
 
 
 @mcp.tool()
@@ -195,7 +204,7 @@ async def get_historical_stock_prices(
         return "Unable to fetch prices or no prices found."
 
     # Stringify the prices
-    return json.dumps(prices, indent=2)
+    return _safe_json(prices, "Unable to fetch prices or no prices found.")
 
 
 @mcp.tool()
@@ -219,7 +228,7 @@ async def get_company_news(ticker: str) -> str:
     # Check if news are found
     if not news:
         return "Unable to fetch news or no news found."
-    return json.dumps(news, indent=2)
+    return _safe_json(news, "Unable to fetch news or no news found.")
 
 
 @mcp.tool()
@@ -238,8 +247,12 @@ async def get_available_crypto_tickers() -> str:
     # Extract the available crypto tickers
     tickers = data.get("tickers", [])
 
+    # Check if tickers are found
+    if not tickers:
+        return "Unable to fetch available crypto tickers or no available crypto tickers found."
+
     # Stringify the available crypto tickers
-    return json.dumps(tickers, indent=2)
+    return _safe_json(tickers, "Unable to fetch available crypto tickers or no available crypto tickers found.")
 
 
 @mcp.tool()
@@ -269,7 +282,7 @@ async def get_crypto_prices(
         return "Unable to fetch prices or no prices found."
 
     # Stringify the prices
-    return json.dumps(prices, indent=2)
+    return _safe_json(prices, "Unable to fetch prices or no prices found.")
 
 
 @mcp.tool()
@@ -305,7 +318,7 @@ async def get_historical_crypto_prices(
         return "Unable to fetch prices or no prices found."
 
     # Stringify the prices
-    return json.dumps(prices, indent=2)
+    return _safe_json(prices, "Unable to fetch prices or no prices found.")
 
 
 @mcp.tool()
@@ -331,7 +344,7 @@ async def get_current_crypto_price(ticker: str) -> str:
         return "Unable to fetch current price or no current price found."
 
     # Stringify the current price
-    return json.dumps(snapshot, indent=2)
+    return _safe_json(snapshot, "Unable to fetch current price or no current price found.")
 
 
 @mcp.tool()
@@ -355,6 +368,10 @@ async def get_sec_filings(
     # Call the API
     data = await make_request(url)
 
+    # Check if data is found
+    if not data:
+        return "Unable to fetch SEC filings or no SEC filings found."
+
     # Extract the SEC filings
     filings = data.get("filings", [])
 
@@ -363,7 +380,7 @@ async def get_sec_filings(
         return f"Unable to fetch SEC filings or no SEC filings found."
 
     # Stringify the SEC filings
-    return json.dumps(filings, indent=2)
+    return _safe_json(filings, "Unable to fetch SEC filings or no SEC filings found.")
 
 if __name__ == "__main__":
     # Log server startup
