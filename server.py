@@ -721,6 +721,210 @@ async def search_knowledge_base(query: str, vault_path: str = "") -> str:
     return json.dumps({"query": query, "total_files": len(results), "results": results}, indent=2)
 
 
+# ---------------------------------------------------------------------------
+# Phase 4 – Periodic analysis & vault CLAUDE.md
+# ---------------------------------------------------------------------------
+
+_VAULT_CLAUDE_MD_TEMPLATE = """\
+# Knowledge Base Management Principles
+
+> This CLAUDE.md lives inside the Obsidian vault.
+> Claude Code reads it automatically when pointed at this directory,
+> so it always follows the same curation rules.
+
+## Directory Layout
+
+| Path | Purpose |
+|------|---------|
+| `raw/` | Unprocessed captures from Web Clipper / mobile notes |
+| `raw/processed/` | Archived originals after wiki entries are created |
+| `wiki/` | Curated, structured knowledge entries |
+| `index.md` | Auto-generated table of contents – do not edit by hand |
+| `log.md` | Append-only activity log – do not edit by hand |
+
+## Processing Rules
+
+1. **One concept per wiki entry.** Split compound articles into multiple files.
+2. **Always add tags.** Choose from existing tags where possible; mint new ones sparingly.
+3. **Preserve source links.** Add a `## Sources` section with the original URL.
+4. **Be lossy on purpose.** Distil the insight, not the full text.
+5. **Archive, never delete.** After creating a wiki entry, call `archive_raw_file` – never delete raw files.
+6. **Update the index.** Call `update_index` and `append_log` at the end of every processing session.
+
+## Wiki Entry Format
+
+```markdown
+---
+title: "Descriptive Title"
+date: YYYY-MM-DD
+tags: ["tag1", "tag2"]
+---
+
+# Descriptive Title
+
+One-paragraph summary of the core idea.
+
+## Key Points
+
+- ...
+
+## My Notes
+
+Personal interpretation / connection to other ideas.
+
+## Sources
+
+- [Original article](https://...)
+```
+
+## Suggested Processing Session Workflow
+
+```
+1. list_raw_files          → see what needs processing
+2. read_raw_file           → read each file
+3. create_wiki_entry       → write structured wiki page
+4. archive_raw_file        → move source to raw/processed/
+5. update_index            → regenerate index.md
+6. append_log              → record what was done
+7. (weekly) generate_weekly_summary → review knowledge growth
+```
+"""
+
+
+@mcp.tool()
+async def generate_vault_claude_md(vault_path: str = "") -> str:
+    """Write a CLAUDE.md into the vault root with knowledge-base management principles.
+
+    Claude Code reads CLAUDE.md automatically when working inside the vault
+    directory, so every session follows the same curation rules without
+    needing to re-explain them.
+
+    Safe to call multiple times – will not overwrite an existing customised
+    CLAUDE.md (use force=True to overwrite).
+
+    Args:
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    dest = vault / "CLAUDE.md"
+    if dest.exists():
+        return (
+            f"CLAUDE.md already exists at {dest}. "
+            "Delete it manually if you want to regenerate."
+        )
+    dest.write_text(_VAULT_CLAUDE_MD_TEMPLATE, encoding="utf-8")
+    return f"CLAUDE.md written to {dest}"
+
+
+@mcp.tool()
+async def get_processing_queue(vault_path: str = "") -> str:
+    """Return the full content of every unprocessed file in raw/, ready for batch processing.
+
+    Call this at the start of a processing session to load all pending
+    captures into context at once. Each file is returned with its name and
+    content so you can create wiki entries without additional read calls.
+
+    Args:
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+    raw_dir = vault / "raw"
+    if not raw_dir.exists():
+        return "raw/ directory does not exist. Run setup_vault_structure first."
+
+    files = sorted(
+        f for f in raw_dir.iterdir()
+        if f.is_file() and not f.name.startswith(".")
+    )
+    if not files:
+        return "raw/ is empty — nothing to process."
+
+    items = []
+    for f in files:
+        try:
+            content = f.read_text(encoding="utf-8")
+        except Exception as exc:
+            content = f"[Could not read file: {exc}]"
+        items.append({"filename": f.name, "size_bytes": f.stat().st_size, "content": content})
+
+    return json.dumps({"count": len(items), "files": items}, indent=2)
+
+
+@mcp.tool()
+async def generate_weekly_summary(vault_path: str = "", since_days: int = 7) -> str:
+    """Collect all wiki entries created or modified in the last N days for review.
+
+    Use this at the start of a weekly review session. Returns metadata and
+    full content so you can synthesise connections across recent entries.
+
+    Args:
+        vault_path:  Absolute path to the Obsidian vault.
+        since_days:  Look-back window in days (default: 7).
+    """
+    vault = _resolve_vault(vault_path)
+    wiki_dir = vault / "wiki"
+    if not wiki_dir.exists():
+        return "wiki/ directory does not exist. Run setup_vault_structure first."
+
+    cutoff = datetime.now(timezone.utc).timestamp() - since_days * 86400
+    recent = []
+    for f in sorted(wiki_dir.iterdir()):
+        if not (f.is_file() and f.suffix == ".md" and not f.name.startswith(".")):
+            continue
+        if f.stat().st_mtime >= cutoff:
+            recent.append({"filename": f.name, "content": f.read_text(encoding="utf-8")})
+
+    if not recent:
+        return f"No wiki entries modified in the last {since_days} days."
+
+    header = {
+        "period_days": since_days,
+        "generated": _today(),
+        "entry_count": len(recent),
+        "entries": recent,
+    }
+    return json.dumps(header, indent=2)
+
+
+@mcp.tool()
+async def get_vault_stats(vault_path: str = "") -> str:
+    """Return a dashboard of key vault metrics.
+
+    Useful at the start or end of a session to see the overall health and
+    growth of the knowledge base.
+
+    Args:
+        vault_path: Absolute path to the Obsidian vault.
+    """
+    vault = _resolve_vault(vault_path)
+
+    def count_md(directory: Path) -> int:
+        if not directory.exists():
+            return 0
+        return sum(1 for f in directory.rglob("*.md") if not f.name.startswith("."))
+
+    raw_count = count_md(vault / "raw") - count_md(vault / "raw" / "processed")
+    processed_count = count_md(vault / "raw" / "processed")
+    wiki_count = count_md(vault / "wiki")
+
+    log_path = vault / "log.md"
+    log_entries = 0
+    if log_path.exists():
+        log_entries = log_path.read_text(encoding="utf-8").count("\n### ")
+
+    stats = {
+        "vault": str(vault),
+        "as_of": _today(),
+        "raw_pending": raw_count,
+        "raw_processed": processed_count,
+        "wiki_entries": wiki_count,
+        "log_entries": log_entries,
+        "claude_md_present": (vault / "CLAUDE.md").exists(),
+        "index_md_present": (vault / "index.md").exists(),
+    }
+    return json.dumps(stats, indent=2)
+
+
 if __name__ == "__main__":
     # Log server startup
     logger.info("Starting Financial Datasets MCP Server...")
