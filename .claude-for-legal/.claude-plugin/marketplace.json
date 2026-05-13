@@ -1,0 +1,35 @@
+{
+  "name": "legal-workflows",
+  "owner": {
+    "name": "Anthropic",
+    "url": "https://github.com/anthropics/claude-for-legal"
+  },
+  "metadata": {
+    "description": "A suite of practice-area plugins for legal workflows. Source: anthropics/claude-for-legal",
+    "version": "1.0.0",
+    "pluginRoot": "."
+  },
+  "plugins": [
+    {
+      "name": "commercial-legal",
+      "source": "commercial-legal",
+      "description": "Practice-area plugin for commercial in-house and firm legal work: contract review, NDA triage, vendor checks, and compliance.",
+      "category": "legal",
+      "tags": ["legal", "contract", "nda", "compliance", "vendor"]
+    },
+    {
+      "name": "privacy-legal",
+      "source": "privacy-legal",
+      "description": "Practice-area plugin for privacy and data-protection legal work: DSAR responses, privacy analysis, and regulatory compliance.",
+      "category": "legal",
+      "tags": ["legal", "privacy", "gdpr", "ccpa", "dsar", "data-protection"]
+    },
+    {
+      "name": "litigation-legal",
+      "source": "litigation-legal",
+      "description": "Practice-area plugin for litigation support: case analysis, claim charts, and brief drafting.",
+      "category": "legal",
+      "tags": ["legal", "litigation", "claims", "brief", "case-analysis"]
+    }
+  ]
+}

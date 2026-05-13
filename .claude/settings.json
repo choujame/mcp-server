@@ -1,0 +1,15 @@
+{
+  "enabledPlugins": {
+    "commercial-legal@legal-workflows": true,
+    "privacy-legal@legal-workflows": true,
+    "litigation-legal@legal-workflows": true
+  },
+  "extraKnownMarketplaces": {
+    "legal-workflows": {
+      "source": {
+        "source": "directory",
+        "path": "/home/user/mcp-server/.claude-for-legal"
+      }
+    }
+  }
+}

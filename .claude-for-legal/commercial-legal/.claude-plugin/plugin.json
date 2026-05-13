@@ -1,0 +1,12 @@
+{
+  "name": "commercial-legal",
+  "version": "1.0.0",
+  "description": "Practice-area plugin for commercial legal work. Automates contract review, NDA triage, vendor checks, and compliance workflows.",
+  "author": {
+    "name": "Anthropic",
+    "url": "https://github.com/anthropics/claude-for-legal"
+  },
+  "repository": "https://github.com/anthropics/claude-for-legal",
+  "license": "Apache-2.0",
+  "keywords": ["legal", "contract", "nda", "compliance", "vendor", "commercial"]
+}

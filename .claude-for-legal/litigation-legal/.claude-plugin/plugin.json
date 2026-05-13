@@ -1,0 +1,12 @@
+{
+  "name": "litigation-legal",
+  "version": "1.0.0",
+  "description": "Practice-area plugin for litigation support. Assists with claim charts, case analysis, brief drafting, and discovery organisation.",
+  "author": {
+    "name": "Anthropic",
+    "url": "https://github.com/anthropics/claude-for-legal"
+  },
+  "repository": "https://github.com/anthropics/claude-for-legal",
+  "license": "Apache-2.0",
+  "keywords": ["legal", "litigation", "claims", "brief", "discovery", "case-analysis"]
+}

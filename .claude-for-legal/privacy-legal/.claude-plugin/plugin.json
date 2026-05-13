@@ -1,0 +1,12 @@
+{
+  "name": "privacy-legal",
+  "version": "1.0.0",
+  "description": "Practice-area plugin for privacy and data-protection legal work. Handles DSAR responses, privacy impact analysis, and regulatory compliance under GDPR, CCPA, and similar frameworks.",
+  "author": {
+    "name": "Anthropic",
+    "url": "https://github.com/anthropics/claude-for-legal"
+  },
+  "repository": "https://github.com/anthropics/claude-for-legal",
+  "license": "Apache-2.0",
+  "keywords": ["legal", "privacy", "gdpr", "ccpa", "dsar", "data-protection"]
+}
