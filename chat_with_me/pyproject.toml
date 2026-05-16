@@ -1,0 +1,19 @@
+[project]
+name = "social-persona-skill"
+version = "0.1.0"
+description = "把公开社交媒体语料整理成能对话、能分析、能改写风格的 Persona Skill"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.28",
+]
+
+[project.scripts]
+social-persona-skill = "social_persona_skill.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
