@@ -174,3 +174,7 @@ cython_debug/
 
 # Ignore vscode
 .vscode/
+
+# chat_with_me runtime (contains auth tokens and backend state)
+.runtime/
+personas/
