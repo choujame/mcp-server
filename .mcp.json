@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "twinkle-hub": {
+      "type": "http",
+      "url": "https://api.twinkleai.tw/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${TWINKLE_HUB_API_KEY}"
+      }
+    }
+  }
+}

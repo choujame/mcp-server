@@ -60,8 +60,9 @@ This MCP server provides the following tools:
    # Create .env file for your API keys
    cp .env.example .env
 
-   # Set API key in .env
+   # Set API keys in .env
    FINANCIAL_DATASETS_API_KEY=your-financial-datasets-api-key
+   TWINKLE_HUB_API_KEY=your-twinkle-hub-api-key
    ```
 
 5. Run the server:
@@ -107,3 +108,23 @@ This MCP server provides the following tools:
    - "What are Apple's recent income statements?"
    - "Show me the current price of Tesla stock"
    - "Get historical prices for MSFT from 2024-01-01 to 2024-12-31"
+
+## Twinkle Hub (Taiwan Open Data)
+
+This project includes a `.mcp.json` configuration that connects [Twinkle Hub](https://hub.twinkleai.tw/) — an MCP service aggregating Taiwan government open data (data.gov.tw and more).
+
+### Setup
+
+1. Sign in at [hub.twinkleai.tw](https://hub.twinkleai.tw/) with Google or GitHub to obtain your API key.
+
+2. Add your key to `.env`:
+   ```
+   TWINKLE_HUB_API_KEY=sk-...
+   ```
+
+3. Claude Code will automatically pick up `.mcp.json` and connect to `https://api.twinkleai.tw/mcp/` using your key.
+
+Alternatively, add it manually via the CLI:
+```bash
+claude mcp add --transport http twinkle-hub https://api.twinkleai.tw/mcp/ --header "Authorization: Bearer sk-..."
+```
