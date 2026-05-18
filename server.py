@@ -5,6 +5,7 @@ import logging
 import sys
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
+from scrapling.fetchers import AsyncFetcher
 
 # Configure logging to write to stderr
 logging.basicConfig(
@@ -364,6 +365,65 @@ async def get_sec_filings(
 
     # Stringify the SEC filings
     return json.dumps(filings, indent=2)
+
+@mcp.tool()
+async def scrape_url(
+    url: str,
+    css_selector: str | None = None,
+) -> str:
+    """Scrape content from a webpage using Scrapling.
+
+    Args:
+        url: The URL to scrape
+        css_selector: Optional CSS selector to extract specific elements (e.g. 'h1', '.price', '#content')
+    """
+    try:
+        fetcher = AsyncFetcher(auto_match=False)
+        page = await fetcher.get(url, stealthy_headers=True)
+        if css_selector:
+            elements = page.css(css_selector)
+            if not elements:
+                return f"No elements found for selector '{css_selector}'"
+            return json.dumps([el.text for el in elements], indent=2)
+        return page.get_all_text(separator="\n", strip=True)
+    except Exception as e:
+        return f"Error scraping {url}: {e}"
+
+
+@mcp.tool()
+async def scrape_table(
+    url: str,
+    table_selector: str = "table",
+) -> str:
+    """Scrape a table from a webpage and return it as JSON.
+
+    Args:
+        url: The URL containing the table
+        table_selector: CSS selector for the table (default: 'table')
+    """
+    try:
+        fetcher = AsyncFetcher(auto_match=False)
+        page = await fetcher.get(url, stealthy_headers=True)
+        tables = page.css(table_selector)
+        if not tables:
+            return "No tables found on the page."
+        results = []
+        for table in tables:
+            headers = [th.text.strip() for th in table.css("th")]
+            rows = []
+            for tr in table.css("tr"):
+                cells = [td.text.strip() for td in tr.css("td")]
+                if cells:
+                    if headers:
+                        rows.append(dict(zip(headers, cells)))
+                    else:
+                        rows.append(cells)
+            if rows:
+                results.append(rows)
+        return json.dumps(results, indent=2)
+    except Exception as e:
+        return f"Error scraping table from {url}: {e}"
+
 
 if __name__ == "__main__":
     # Log server startup
