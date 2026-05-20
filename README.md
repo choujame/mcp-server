@@ -24,7 +24,7 @@ This MCP server provides the following tools:
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.11 or higher
 - [uv](https://github.com/astral-sh/uv) package manager
 
 ### Installation
@@ -44,15 +44,14 @@ This MCP server provides the following tools:
    curl -LsSf https://astral.sh/uv/install.ps1 | powershell
    ```
 
-3. Install dependencies:
+3. Create a virtual environment and install dependencies:
    ```bash
-   # Create virtual env and activate it
+   # Create and activate virtual environment
    uv venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    
-   # Install dependencies
-   uv add "mcp[cli]" httpx  # On Windows: uv add mcp[cli] httpx
-
+   # Install dependencies from pyproject.toml
+   uv sync
    ```
 
 4. Set up environment variables:
@@ -74,13 +73,26 @@ This MCP server provides the following tools:
 1. Install [Claude Desktop](https://claude.ai/desktop) if you haven't already
 
 2. Create or edit the Claude Desktop configuration file:
+   
+   **macOS:**
    ```bash
-   # macOS
    mkdir -p ~/Library/Application\ Support/Claude/
    nano ~/Library/Application\ Support/Claude/claude_desktop_config.json
    ```
+   
+   **Windows:**
+   ```bash
+   # Open %APPDATA%\Claude\claude_desktop_config.json in your text editor
+   # Or create the file if it doesn't exist
+   ```
+   
+   **Linux:**
+   ```bash
+   mkdir -p ~/.config/Claude
+   nano ~/.config/Claude/claude_desktop_config.json
+   ```
 
-3. Add the following configuration:
+3. Add the following configuration, replacing the paths with your system's paths:
    ```json
    {
      "mcpServers": {
@@ -88,7 +100,7 @@ This MCP server provides the following tools:
          "command": "/path/to/uv",
          "args": [
            "--directory",
-           "/absolute/path/to/financial-datasets-mcp",
+           "/absolute/path/to/mcp-server",
            "run",
            "server.py"
          ]
@@ -97,7 +109,9 @@ This MCP server provides the following tools:
    }
    ```
    
-   Replace `/path/to/uv` with the result of `which uv` and `/absolute/path/to/financial-datasets-mcp` with the absolute path to this project.
+   To find the paths:
+   - **`/path/to/uv`**: Run `which uv` (macOS/Linux) or `where uv` (Windows)
+   - **`/absolute/path/to/mcp-server`**: Run `pwd` in the mcp-server directory (macOS/Linux) or `cd` to see the path (Windows)
 
 4. Restart Claude Desktop
 
