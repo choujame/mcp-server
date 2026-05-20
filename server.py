@@ -425,6 +425,104 @@ async def scrape_table(
         return f"Error scraping table from {url}: {e}"
 
 
+@mcp.tool()
+async def scrape_stock_summary(ticker: str) -> str:
+    """Scrape key fundamental metrics for a stock (P/E, EPS, market cap, etc.) from Finviz.
+
+    Args:
+        ticker: Stock ticker symbol (e.g. AAPL, GOOGL)
+    """
+    url = f"https://finviz.com/quote.ashx?t={ticker.upper()}"
+    try:
+        fetcher = AsyncFetcher(auto_match=False)
+        page = await fetcher.get(url, stealthy_headers=True)
+        cells = page.css("table.snapshot-table2 td")
+        if not cells:
+            return f"No fundamental data found for {ticker}."
+        keys = [c.text.strip() for i, c in enumerate(cells) if i % 2 == 0]
+        values = [c.text.strip() for i, c in enumerate(cells) if i % 2 == 1]
+        return json.dumps(dict(zip(keys, values)), indent=2)
+    except Exception as e:
+        return f"Error scraping stock summary for {ticker}: {e}"
+
+
+@mcp.tool()
+async def scrape_earnings_calendar(date: str | None = None) -> str:
+    """Scrape upcoming earnings announcements.
+
+    Args:
+        date: Date in YYYY-MM-DD format (default: today)
+    """
+    from datetime import date as dt
+    target = date or dt.today().strftime("%Y-%m-%d")
+    url = f"https://stockanalysis.com/calendar/earnings/?date={target}"
+    try:
+        fetcher = AsyncFetcher(auto_match=False)
+        page = await fetcher.get(url, stealthy_headers=True)
+        headers = [th.text.strip() for th in page.css("table thead th")]
+        rows = page.css("table tbody tr")
+        if not rows:
+            return f"No earnings data found for {target}."
+        results = []
+        for row in rows:
+            cells = [td.text.strip() for td in row.css("td")]
+            if cells:
+                results.append(dict(zip(headers, cells)) if headers else cells)
+        return json.dumps(results, indent=2)
+    except Exception as e:
+        return f"Error scraping earnings calendar: {e}"
+
+
+@mcp.tool()
+async def scrape_insider_trades(ticker: str) -> str:
+    """Scrape recent insider trading transactions for a stock from OpenInsider.
+
+    Args:
+        ticker: Stock ticker symbol (e.g. AAPL, GOOGL)
+    """
+    url = f"http://openinsider.com/search?q={ticker.upper()}"
+    try:
+        fetcher = AsyncFetcher(auto_match=False)
+        page = await fetcher.get(url, stealthy_headers=True)
+        headers = [th.text.strip() for th in page.css("table.tinytable thead th")]
+        rows = page.css("table.tinytable tbody tr")
+        if not rows:
+            return f"No insider trading data found for {ticker}."
+        results = []
+        for row in rows:
+            cells = [td.text.strip() for td in row.css("td")]
+            if cells:
+                results.append(dict(zip(headers, cells)) if headers else cells)
+        return json.dumps(results[:20], indent=2)
+    except Exception as e:
+        return f"Error scraping insider trades for {ticker}: {e}"
+
+
+@mcp.tool()
+async def scrape_analyst_ratings(ticker: str) -> str:
+    """Scrape analyst price targets and buy/sell ratings for a stock.
+
+    Args:
+        ticker: Stock ticker symbol (e.g. AAPL, GOOGL)
+    """
+    url = f"https://stockanalysis.com/stocks/{ticker.lower()}/forecast/"
+    try:
+        fetcher = AsyncFetcher(auto_match=False)
+        page = await fetcher.get(url, stealthy_headers=True)
+        headers = [th.text.strip() for th in page.css("table thead th")]
+        rows = page.css("table tbody tr")
+        if not rows:
+            return f"No analyst ratings found for {ticker}."
+        results = []
+        for row in rows:
+            cells = [td.text.strip() for td in row.css("td")]
+            if cells:
+                results.append(dict(zip(headers, cells)) if headers else cells)
+        return json.dumps(results, indent=2)
+    except Exception as e:
+        return f"Error scraping analyst ratings for {ticker}: {e}"
+
+
 if __name__ == "__main__":
     # Log server startup
     logger.info("Starting Financial Datasets MCP Server...")
