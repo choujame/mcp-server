@@ -1,8 +1,8 @@
-# Telegram Bot 简单部署指南
+# Telegram Bot 簡單部署指南
 
-这是最简单的部署方式，只需 3 个步骤！
+這是最簡單的部署方式，只需 3 個步驟！
 
-## 📋 **您的配置信息**
+## 📋 **您的配置資訊**
 
 ```
 Telegram Token: 8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI
@@ -14,9 +14,9 @@ Ngrok URL: https://outlet-oxford-clothing.ngrok-free.dev
 
 ## 🚀 **3 步快速部署**
 
-### **Step 1: 设置 Telegram Webhook（复制粘贴）**
+### **Step 1: 設定 Telegram Webhook（複製貼上）**
 
-在 PowerShell 运行：
+在 PowerShell 運行：
 
 ```powershell
 $token = "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI"
@@ -25,20 +25,20 @@ $api = "https://api.telegram.org/bot$token/setWebhook?url=$url"
 curl $api
 ```
 
-应该显示：`{"ok":true,"result":true}`
+應該顯示：`{"ok":true,"result":true}`
 
 ---
 
-### **Step 2: 在 n8n 中创建简单 Workflow**
+### **Step 2: 在 n8n 中建立簡單 Workflow**
 
 **在 n8n 中：**
 
-1. **点击 "Create"** → **"New Workflow"**
+1. **點擊 "Create"** → **"New Workflow"**
 
-2. **添加节点**：
-   - **Webhook**（触发器）
-   - **Function**（处理消息）
-   - **Telegram Send Message**（发送回复）
+2. **添加節點**：
+   - **Webhook**（觸發器）
+   - **Function**（處理訊息）
+   - **Telegram Send Message**（發送回覆）
 
 3. **配置 Webhook**：
    ```
@@ -47,12 +47,12 @@ curl $api
    Response Code: 200
    ```
 
-4. **配置 Function 节点**：
+4. **配置 Function 節點**：
    ```javascript
    return {
      message_id: $input.first().input.message.message_id,
      chat_id: $input.first().input.message.chat.id,
-     text: "收到您的消息！"
+     text: "收到您的訊息！"
    };
    ```
 
@@ -60,59 +60,59 @@ curl $api
    ```
    Token: 8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI
    Chat ID: 6119894493
-   Message: 你好！我收到了您的消息
+   Message: 你好！我收到了您的訊息
    ```
 
-6. **保存并启用**
+6. **保存並啟用**
 
 ---
 
-### **Step 3: 测试**
+### **Step 3: 測試**
 
-1. **打开 Telegram**
+1. **打開 Telegram**
 
-2. **给您的 bot 发送消息**
+2. **給您的 bot 發送訊息**
 
-3. **应该会收到回复**
+3. **應該會收到回覆**
 
 4. **完成！** ✅
 
 ---
 
-## ✅ **就这么简单！**
+## ✅ **就這麼簡單！**
 
-没有复杂的配置，没有 LINE Developers，只需 3 步就能运行一个工作的 Telegram bot。
-
----
-
-## 🆘 **如果有问题**
-
-### **503 或 502 错误？**
-- 检查 Ngrok 是否还在运行
-- 检查 n8n 是否在线
-- 重新运行 Step 1 的 PowerShell 命令
-
-### **没有收到消息？**
-- 确保 Webhook 节点已启用
-- 确保整个 workflow 已启用（绿色）
-- 检查 n8n Executions 日志
-
-### **收不到回复？**
-- 检查 Telegram Token 是否正确
-- 检查 Chat ID 是否正确
-- 查看 n8n Function 节点有无错误
+沒有複雜的配置，沒有 LINE Developers，只需 3 步就能運行一個工作的 Telegram bot。
 
 ---
 
-## 💡 **优势**
+## 🆘 **如果有問題**
 
-✅ 最简单 - 只需 3 个节点  
-✅ 最快 - 5 分钟部署  
-✅ 最可靠 - Telegram 比 LINE 简单  
-✅ 可扩展 - 之后可以添加更多功能
+### **503 或 502 錯誤？**
+- 檢查 Ngrok 是否還在運行
+- 檢查 n8n 是否在線
+- 重新運行 Step 1 的 PowerShell 命令
+
+### **沒有收到訊息？**
+- 確保 Webhook 節點已啟用
+- 確保整個 workflow 已啟用（綠色）
+- 檢查 n8n Executions 日誌
+
+### **收不到回覆？**
+- 檢查 Telegram Token 是否正確
+- 檢查 Chat ID 是否正確
+- 查看 n8n Function 節點有無錯誤
 
 ---
 
-**现在就开始吧！** 👈
+## 💡 **優勢**
 
-有任何问题随时问我！
+✅ 最簡單 - 只需 3 個節點  
+✅ 最快 - 5 分鐘部署  
+✅ 最可靠 - Telegram 比 LINE 簡單  
+✅ 可擴展 - 之後可以添加更多功能
+
+---
+
+**現在就開始吧！** 👈
+
+有任何問題隨時問我！
