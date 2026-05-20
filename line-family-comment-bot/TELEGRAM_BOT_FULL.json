@@ -1,0 +1,135 @@
+{
+  "name": "Telegram Family Bot - Full Features",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const message = $input.first().input.message;\nreturn {\n  chat_id: message.chat.id,\n  message_id: message.message_id,\n  user_name: message.from.first_name,\n  text: message.text || '',\n  has_photo: !!message.photo,\n  timestamp: message.date\n};"
+      },
+      "id": "parse_message",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "simple_memory",
+      "name": "Simple Memory",
+      "type": "n8n-nodes-base.memorySimple",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const text = $input.first().json.text.toLowerCase();\nconst keywords = ['你好', '早', '晚', '晚安', '再見', '謝謝', '幫助', '醫生', '診斷', '症狀'];\nconst shouldReply = keywords.some(k => text.includes(k)) || text.length > 3;\nreturn { should_reply: shouldReply };"
+      },
+      "id": "intent_judge",
+      "name": "Intent Judge",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "model": "mixtral-8x7b-32768",
+        "options": {
+          "baseUrl": "https://api.groq.com/openai/v1",
+          "apiKey": "YOUR_GROQ_API_KEY"
+        }
+      },
+      "id": "llm_chat",
+      "name": "LLM Chat",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "token": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
+        "chatId": "6119894493",
+        "text": "=您：{{$node[\"Parse Message\"].json.text}}\n\n家庭助手：{{$node[\"LLM Chat\"].json.choices[0].message.content}}"
+      },
+      "id": "send_telegram",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1100, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Message": {
+      "main": [
+        [
+          {
+            "node": "Simple Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "main": [
+        [
+          {
+            "node": "Intent Judge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Judge": {
+      "main": [
+        [
+          {
+            "node": "LLM Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Chat": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
