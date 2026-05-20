@@ -1,0 +1,66 @@
+{
+  "name": "Telegram Bot Simple",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "return {\n  chat_id: $input.first().input.message.chat.id,\n  message_id: $input.first().input.message.message_id,\n  text: $input.first().input.message.text\n};"
+      },
+      "id": "function",
+      "name": "Process Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [300, 200]
+    },
+    {
+      "parameters": {
+        "token": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
+        "chatId": "6119894493",
+        "text": "=你好！我收到了您的消息：{{$json.text}}"
+      },
+      "id": "telegram",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [500, 200]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}
