@@ -26,9 +26,12 @@
     },
     {
       "parameters": {
-        "token": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
+        "authentication": "botToken",
+        "botToken": "YOUR_TELEGRAM_TOKEN",
+        "resource": "message",
+        "operation": "sendMessage",
         "chatId": "6119894493",
-        "text": "您說：{{$json.text}}\n\n我收到了！"
+        "text": "感謝您的訊息！我已收到。"
       },
       "id": "telegram",
       "name": "Send Telegram Message",
