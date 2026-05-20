@@ -1,0 +1,13 @@
+.DS_Store
+.env
+*.log
+*.sqlite
+*.sqlite-*
+*.db
+database.sqlite
+config
+binaryData/
+node_modules/
+dist/
+tmp/
+

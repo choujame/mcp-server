@@ -1,0 +1,727 @@
+{
+  "name": "LINE_FAMILY_COMMENT_BOT_PUBLIC_TEMPLATE",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "linebot",
+        "options": {}
+      },
+      "id": "webhook-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-1248, -64],
+      "webhookId": "replace-after-import"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "line-token",
+              "name": "CHANNEL_ACCESS_TOKEN",
+              "type": "string",
+              "value": "PASTE_YOUR_LINE_CHANNEL_ACCESS_TOKEN_HERE"
+            },
+            {
+              "id": "line-secret",
+              "name": "CHANNEL_SECRET",
+              "type": "string",
+              "value": "PASTE_YOUR_LINE_CHANNEL_SECRET_HERE"
+            },
+            {
+              "id": "line-channel-id",
+              "name": "CHANNEL_ID",
+              "type": "string",
+              "value": "PASTE_YOUR_LINE_CHANNEL_ID_HERE"
+            },
+            {
+              "id": "bot-mention-name",
+              "name": "BOT_MENTION_NAME",
+              "type": "string",
+              "value": "家庭分身"
+            },
+            {
+              "id": "bot-persona-name",
+              "name": "BOT_PERSONA_NAME",
+              "type": "string",
+              "value": "你的名字"
+            },
+            {
+              "id": "elder-a-name",
+              "name": "ELDER_A_DISPLAY_NAME",
+              "type": "string",
+              "value": "LINE 顯示名稱 1"
+            },
+            {
+              "id": "elder-a-address",
+              "name": "ELDER_A_ADDRESS",
+              "type": "string",
+              "value": "媽媽"
+            },
+            {
+              "id": "elder-b-name",
+              "name": "ELDER_B_DISPLAY_NAME",
+              "type": "string",
+              "value": "LINE 顯示名稱 2"
+            },
+            {
+              "id": "elder-b-address",
+              "name": "ELDER_B_ADDRESS",
+              "type": "string",
+              "value": "爸爸"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config-001",
+      "name": "LINE Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-960, -64]
+    },
+    {
+      "parameters": {
+        "jsCode": "try {\n  const webhookNode = $('Webhook').first();\n  const config = $('LINE Config').first().json;\n  const body = webhookNode ? (webhookNode.json.body || webhookNode.json) : {};\n  const events = body.events || [];\n  const result = [];\n\n  for (const event of events) {\n    if (event.type === 'webhook_verification') {\n      return [{ json: { isVerification: true, replyToken: event.replyToken } }];\n    }\n    if (event.type !== 'message') continue;\n\n    const message = event.message || {};\n    const source = event.source || {};\n    const type = message.type || 'text';\n    const text = message.text || '';\n    const mentions = message.mention?.mentionees || message.mentions?.mentionees || [];\n    const mentionName = config.BOT_MENTION_NAME || '家庭分身';\n    const mentionTextHit = typeof text === 'string' && text.includes(mentionName);\n    const isMentioned = mentionTextHit || mentions.some((m) => m?.isSelf === true || m?.type === 'bot' || m?.mentioneeType === 'bot');\n    const messageId = message.id;\n    const userId = source.userId || '';\n    const sourceType = source.type || 'user';\n    const sourceKey = source.groupId || source.roomId || userId || 'unknown';\n    const sessionKey = `line:${sourceType}:${sourceKey}`;\n    const isMedicalCandidate = /[醫藥病痛診癌感血糖壓眠]/.test(text);\n\n    result.push({\n      json: {\n        text,\n        type,\n        messageId,\n        replyToken: event.replyToken,\n        userId,\n        displayName: '',\n        isMentioned,\n        isMedicalCandidate,\n        sourceType,\n        sourceKey,\n        sessionKey,\n      }\n    });\n  }\n\n  if (result.length === 0) {\n    return [{ json: { type: 'unknown', text: 'no message', displayName: '', sessionKey: 'line:unknown' } }];\n  }\n\n  return result;\n} catch (error) {\n  return [{ json: { error: error.message, displayName: '', sessionKey: 'line:error' } }];\n}\n"
+      },
+      "id": "gatekeeper-001",
+      "name": "Gatekeeper Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-800, -48]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.line.me/v2/bot/profile/{{ $json.userId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('LINE Config').first().json.CHANNEL_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "fetch-profile-001",
+      "name": "Fetch LINE Profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-608, -32],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item, index) => {\n  const base = $('Gatekeeper Code').all()[index]?.json || item.json || {};\n  const profile = item.json || {};\n  return {\n    json: {\n      ...base,\n      displayName: profile.displayName || base.displayName || '',\n    }\n  };\n});\n"
+      },
+      "id": "merge-profile-001",
+      "name": "Merge Profile Name",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-416, -32]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "image-rule",
+                    "leftValue": "={{ $json.type }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "image"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "medical-rule",
+                    "leftValue": "={{ !!$json.isMedicalCandidate }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "rightValue": true
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "text-rule",
+                    "leftValue": "=fallback",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "fallback"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "branch-001",
+      "name": "Branch Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [-208, -48]
+    },
+    {
+      "parameters": {
+        "url": "=https://api-data.line.me/v2/bot/message/{{ $json.messageId }}/content",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('LINE Config').first().json.CHANNEL_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "download-image-001",
+      "name": "Download LINE Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [16, -464],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nif (!staticData.imageBurstControl) {\n  staticData.imageBurstControl = { processingUntil: 0, cooldownByUser: {} };\n}\n\nconst state = staticData.imageBurstControl;\nconst now = Date.now();\nconst PROCESSING_MS = 70 * 1000;\nconst COOLDOWN_MS = 30 * 1000;\n\nfor (const [uid, ts] of Object.entries(state.cooldownByUser)) {\n  if (!ts || now - ts > COOLDOWN_MS) delete state.cooldownByUser[uid];\n}\n\nreturn items.map(item => {\n  const userId = item.json.userId || 'unknown';\n  const processingLocked = (state.processingUntil || 0) > now;\n  const lastUserTs = state.cooldownByUser[userId] || 0;\n  const cooldownLocked = !!lastUserTs && (now - lastUserTs <= COOLDOWN_MS);\n  let allow = false;\n  let reason = '';\n\n  if (processingLocked) reason = 'another image is currently being processed';\n  else if (cooldownLocked) reason = 'image burst within 30s';\n  else {\n    allow = true;\n    state.processingUntil = now + PROCESSING_MS;\n    state.cooldownByUser[userId] = now;\n    reason = 'passed image fence';\n  }\n\n  return { json: { ...item.json, allowImageReply: allow, imageThrottleReason: reason }, binary: item.binary, pairedItem: item.pairedItem };\n});"
+      },
+      "id": "image-throttle-001",
+      "name": "Image Throttle Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [208, -560]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "allow-image",
+                    "leftValue": "={{ !!$json.allowImageReply }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "rightValue": true
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "image-switch-001",
+      "name": "Image Throttle Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [384, -560]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=你現在在家庭 LINE 群組裡回覆圖片。你是 {{ $('LINE Config').first().json.BOT_PERSONA_NAME }} 的分身，不是外部 AI 助理。\n\n任務：看到圖片後，用家人自然聊天的語氣接一句話。\n\n回覆原則：\n- 一律使用台灣繁體中文，禁止簡體中文\n- 一般 1 到 2 句即可，150 字內\n- 溫暖、簡短、得體，不要像客服\n- 不要自稱 AI、助理、機器人\n- 直接給可貼回 LINE 的文字，不要解釋圖片分析過程\n\n安全規則：\n- 不要猜照片裡的人是誰\n- 不要評論人物年齡、胖瘦、美醜、健康、情緒或精神狀態\n- 如果是文件、信件、通知、帳單、證件或截圖，不要逐字解讀，也不要推論是哪個人或哪個機構的文件\n- 如果不確定，就只回畫面氛圍或一句中性安全的話\n\n目前發話者：{{ $json.displayName || '對方' }}\n請直接回一句最安全、自然、得體的話。",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "HumanMessagePromptTemplate",
+              "messageType": "imageBinary",
+              "imageDetail": "low"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "vision-chain-001",
+      "name": "Vision LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [752, -624],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('LINE Config').first().json;\nreturn items.map(item => {\n  let currentAddress = item.json.displayName || '對方';\n  if (item.json.displayName === config.ELDER_A_DISPLAY_NAME) currentAddress = config.ELDER_A_ADDRESS || currentAddress;\n  else if (item.json.displayName === config.ELDER_B_DISPLAY_NAME) currentAddress = config.ELDER_B_ADDRESS || currentAddress;\n\n  return {\n    json: {\n      ...item.json,\n      currentAddress,\n      personaContext: `你正在家庭 LINE 群組中回話。你是 ${config.BOT_PERSONA_NAME || '某位家人'} 的分身，不是客服，也不是一般 AI 助理。你的任務是自然接話、暖場，在需要時照顧長輩情緒，但不要亂套稱呼或語氣。\\n\\n回話原則：\\n- 用台灣繁體中文\\n- 簡短、溫暖、有人味\\n- 不要自稱 AI、助理、機器人\\n- 不要過度分析，不必展示思考過程\\n- 只有當前發話者符合設定的 LINE 顯示名稱時，才使用設定的親屬稱呼\\n- 如果不確定，稱呼「你」或對方的 LINE 顯示名稱即可`\n    }\n  };\n});"
+      },
+      "id": "normal-context-001",
+      "name": "Prepare Normal Chat Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [112, 304]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "general-whitelist",
+                    "leftValue": "={{ (() => { const config = $('LINE Config').first().json; const name = String($json.displayName || '').trim(); const allowedName = name === config.ELDER_A_DISPLAY_NAME || name === config.ELDER_B_DISPLAY_NAME; return allowedName || !!$json.isMentioned; })() }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "rightValue": true
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "general-whitelist-001",
+      "name": "General Chat Whitelist",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [384, 400]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=你是一個家庭 LINE 群組回覆判斷器。請只判斷這一句話，這個 bot 應不應該插話回覆。\n\n只有在「明確屬於沒有針對性的開放式閒聊或生活分享」時，才 allow=true。其餘情況一律 allow=false。\n\n請保守判斷，寧可少回，不要亂插話。\n\n輸出格式固定，只輸出一行 JSON，不要解釋：\n{\"allow\": true 或 false, \"reason\": \"一句很短的繁中理由\"}\n\n目前發話者：{{ $json.displayName || '對方' }}\n訊息內容：{{ $json.text }}",
+        "batching": {}
+      },
+      "id": "intent-judge-001",
+      "name": "General Chat Intent Judge",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [704, 784]
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const raw = (item.json.text || item.json.output || '').trim();\n  let parsed = null;\n  try { parsed = JSON.parse(raw); } catch (e) {\n    const match = raw.match(/\\{[\\s\\S]*\\}/);\n    if (match) {\n      try { parsed = JSON.parse(match[0]); } catch (e2) {}\n    }\n  }\n  const allow = parsed && typeof parsed.allow === 'boolean' ? parsed.allow : false;\n  const reason = parsed && typeof parsed.reason === 'string' && parsed.reason.trim() ? parsed.reason.trim() : (allow ? '一般閒聊' : '像是在對特定人說話或交辦');\n  return { json: { ...$('Prepare Normal Chat Context').first().json, intentRaw: raw, allowGeneralReply: allow, skipReason: reason } };\n});"
+      },
+      "id": "parse-intent-001",
+      "name": "Parse Chat Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1056, 816]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "allow-general",
+                    "leftValue": "={{ !!$json.isMentioned || !!$json.allowGeneralReply }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "rightValue": true
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "intent-switch-001",
+      "name": "General Chat Intent Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [1376, 832]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=固定背景：\n{{ $json.personaContext }}\n\n當前發話者名字：{{ $json.displayName || '對方' }}\n你現在應該使用的稱呼：{{ $json.currentAddress || ($json.displayName || '對方') }}\n對方剛剛說：{{ $json.text }}\n\n請參考同一個群組聊天室中的既有記憶與最近對話脈絡，直接自然回一句即可，不必展示思考過程，不必長篇分析，不要用條列。回答一律使用台灣繁體中文，禁止簡體中文、禁止英文整句。"
+      },
+      "id": "normal-agent-001",
+      "name": "Normal Chat Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [1728, -80]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=請一律使用台灣繁體中文回覆，禁止簡體中文、禁止英文整句。使用者名稱：{{ $json.displayName || '對方' }}。問題：{{ $json.text }}\n\n若有需要可使用工具查詢；回答要溫暖、清楚、避免過度武斷。若涉及醫療，請提醒對方這不是正式診斷，重要症狀或用藥問題應詢問醫師或藥師。",
+        "options": {}
+      },
+      "id": "medical-agent-001",
+      "name": "Medical Search Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [720, 64]
+    },
+    {
+      "parameters": {},
+      "id": "wiki-tool-001",
+      "name": "Wiki Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
+      "typeVersion": 1,
+      "position": [848, 256]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionKey }}",
+        "contextWindowLength": 5
+      },
+      "id": "memory-001",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [1232, 656]
+    },
+    {
+      "parameters": {
+        "model": {
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "llm-intent-001",
+      "name": "OpenAI-compatible Model - Intent",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [720, 1024]
+    },
+    {
+      "parameters": {
+        "model": {
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "llm-vision-001",
+      "name": "OpenAI-compatible Model - Vision",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [736, -288]
+    },
+    {
+      "parameters": {
+        "model": {
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "llm-chat-001",
+      "name": "OpenAI-compatible Model - Chat",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [1712, 480]
+    },
+    {
+      "parameters": {
+        "model": {
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "llm-medical-001",
+      "name": "OpenAI-compatible Model - Medical",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [704, 272]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('LINE Config').first().json.CHANNEL_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "replyToken",
+              "value": "={{ $('Gatekeeper Code').first().json.replyToken }}"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{ type: 'text', text: $json.text }] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "reply-image-001",
+      "name": "Reply LINE Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1936, -560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('LINE Config').first().json.CHANNEL_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "replyToken",
+              "value": "={{ $('Gatekeeper Code').first().json.replyToken }}"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{ type: 'text', text: $json.output }] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "reply-medical-001",
+      "name": "Reply Medical Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [2256, 208]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('LINE Config').first().json.CHANNEL_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "replyToken",
+              "value": "={{ $('Gatekeeper Code').first().json.replyToken }}"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{ type: 'text', text: $json.output || $json.text || '好喔' }] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "reply-normal-001",
+      "name": "Reply Normal Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [2256, -48]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('LINE Config').first().json.CHANNEL_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "replyToken",
+              "value": "={{ $('Gatekeeper Code').first().json.replyToken }}"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{ type: 'text', text: '我有收到這張圖片，但剛剛分析時有點卡住。麻煩你再傳一次，我再幫你看。' }] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "reply-image-fallback-001",
+      "name": "Reply Image Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2224, -384]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "LINE Config", "type": "main", "index": 0}]]
+    },
+    "LINE Config": {
+      "main": [[{"node": "Gatekeeper Code", "type": "main", "index": 0}]]
+    },
+    "Gatekeeper Code": {
+      "main": [[{"node": "Fetch LINE Profile", "type": "main", "index": 0}]]
+    },
+    "Fetch LINE Profile": {
+      "main": [[{"node": "Merge Profile Name", "type": "main", "index": 0}]]
+    },
+    "Merge Profile Name": {
+      "main": [[{"node": "Branch Switch", "type": "main", "index": 0}]]
+    },
+    "Branch Switch": {
+      "main": [
+        [{"node": "Download LINE Image", "type": "main", "index": 0}],
+        [{"node": "Medical Search Agent", "type": "main", "index": 0}],
+        [{"node": "Prepare Normal Chat Context", "type": "main", "index": 0}]
+      ]
+    },
+    "Download LINE Image": {
+      "main": [
+        [{"node": "Image Throttle Gate", "type": "main", "index": 0}],
+        [{"node": "Reply Image Fallback", "type": "main", "index": 0}]
+      ]
+    },
+    "Image Throttle Gate": {
+      "main": [[{"node": "Image Throttle Switch", "type": "main", "index": 0}]]
+    },
+    "Image Throttle Switch": {
+      "main": [[{"node": "Vision LLM Chain", "type": "main", "index": 0}]]
+    },
+    "Vision LLM Chain": {
+      "main": [[{"node": "Reply LINE Analysis", "type": "main", "index": 0}]]
+    },
+    "Prepare Normal Chat Context": {
+      "main": [[{"node": "General Chat Whitelist", "type": "main", "index": 0}]]
+    },
+    "General Chat Whitelist": {
+      "main": [[{"node": "General Chat Intent Judge", "type": "main", "index": 0}]]
+    },
+    "General Chat Intent Judge": {
+      "main": [[{"node": "Parse Chat Intent", "type": "main", "index": 0}]]
+    },
+    "Parse Chat Intent": {
+      "main": [[{"node": "General Chat Intent Switch", "type": "main", "index": 0}]]
+    },
+    "General Chat Intent Switch": {
+      "main": [[{"node": "Normal Chat Agent", "type": "main", "index": 0}]]
+    },
+    "OpenAI-compatible Model - Intent": {
+      "ai_languageModel": [[{"node": "General Chat Intent Judge", "type": "ai_languageModel", "index": 0}]]
+    },
+    "OpenAI-compatible Model - Vision": {
+      "ai_languageModel": [[{"node": "Vision LLM Chain", "type": "ai_languageModel", "index": 0}]]
+    },
+    "OpenAI-compatible Model - Chat": {
+      "ai_languageModel": [[{"node": "Normal Chat Agent", "type": "ai_languageModel", "index": 0}]]
+    },
+    "OpenAI-compatible Model - Medical": {
+      "ai_languageModel": [[{"node": "Medical Search Agent", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Wiki Tool": {
+      "ai_tool": [[{"node": "Medical Search Agent", "type": "ai_tool", "index": 0}]]
+    },
+    "Simple Memory": {
+      "ai_memory": [[{"node": "Normal Chat Agent", "type": "ai_memory", "index": 0}]]
+    },
+    "Medical Search Agent": {
+      "main": [[{"node": "Reply Medical Response", "type": "main", "index": 0}]]
+    },
+    "Normal Chat Agent": {
+      "main": [[{"node": "Reply Normal Message", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 300
+  },
+  "tags": [],
+  "pinData": {}
+}
