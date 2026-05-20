@@ -23,7 +23,6 @@ def _username_from_url(url: str) -> str:
 def collect(url: str, token: str, db: str) -> list:
     try:
         from Scweet.scweet import scrape
-        from Scweet.user import get_user_information
     except ImportError:
         print("[scweet] Scweet not installed. Run: backend bootstrap x", file=sys.stderr)
         return []
@@ -32,7 +31,6 @@ def collect(url: str, token: str, db: str) -> list:
     os.environ["auth_token"] = token
 
     try:
-        # Collect user timeline (last ~200 tweets)
         data = scrape(
             users=[username],
             since="2020-01-01",
@@ -52,12 +50,14 @@ def collect(url: str, token: str, db: str) -> list:
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Collect tweets from a user's timeline using Scweet"
+    )
     sub = parser.add_subparsers(dest="cmd")
     cp = sub.add_parser("collect")
-    cp.add_argument("--url", required=True)
-    cp.add_argument("--token", required=True)
-    cp.add_argument("--db", default="scweet_state.db")
+    cp.add_argument("--url", required=True, help="X/Twitter profile URL")
+    cp.add_argument("--token", required=True, help="X auth_token cookie value")
+    cp.add_argument("--db", default="scweet_state.db", help="Scweet resume DB path")
     args = parser.parse_args()
 
     if args.cmd == "collect":

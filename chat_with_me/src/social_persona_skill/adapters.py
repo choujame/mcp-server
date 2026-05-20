@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import List
 import uuid
 
-from .models import Platform, AccountInput, AccountRecord, CorpusRecord
+from .models import Platform, AccountRecord, CorpusRecord
 
 
 def _now_str() -> str:

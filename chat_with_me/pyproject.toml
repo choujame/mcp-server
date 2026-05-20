@@ -1,7 +1,11 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "social-persona-skill"
 version = "0.1.0"
-description = "把公开社交媒体语料整理成能对话、能分析、能改写风格的 Persona Skill"
+description = "Minimal persona distillation scaffold with equal-priority multi-platform live smoke tests."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,7 +17,3 @@ social-persona-skill = "social_persona_skill.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.backends.legacy:build"

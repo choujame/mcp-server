@@ -1,7 +1,7 @@
 """
 Xiaohongshu collection helper — runs inside the MediaCrawler venv.
 Usage:
-  python xiaohongshu_collect.py login  --state-dir=<dir> --repo=<path>
+  python xiaohongshu_collect.py login   --state-dir=<dir> --repo=<path>
   python xiaohongshu_collect.py collect --url=<url> --state-dir=<dir> --repo=<path>
 Output: JSON array of note dicts to stdout.
 """
@@ -58,7 +58,6 @@ def do_collect(url: str, state_dir: str, repo: str) -> list:
     try:
         import asyncio
         from playwright.async_api import async_playwright
-        import json as _json
 
         results = []
 
@@ -85,7 +84,7 @@ def do_collect(url: str, state_dir: str, repo: str) -> list:
                 await page.goto(f"https://www.xiaohongshu.com/user/profile/{user_id}")
                 await page.wait_for_timeout(5000)
 
-                # Scroll to load more
+                # Scroll to load more posts
                 for _ in range(5):
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                     await page.wait_for_timeout(2000)
@@ -101,16 +100,21 @@ def do_collect(url: str, state_dir: str, repo: str) -> list:
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("cmd", choices=["login", "collect"])
-    parser.add_argument("--url", default="")
-    parser.add_argument("--state-dir", required=True)
-    parser.add_argument("--repo", required=True)
+    parser = argparse.ArgumentParser(
+        description="Collect notes from a Xiaohongshu user profile"
+    )
+    parser.add_argument("cmd", choices=["login", "collect"], help="Command to run")
+    parser.add_argument("--url", default="", help="Xiaohongshu profile URL (for collect)")
+    parser.add_argument("--state-dir", required=True, help="Browser state directory")
+    parser.add_argument("--repo", required=True, help="MediaCrawler repo path")
     args = parser.parse_args()
 
     if args.cmd == "login":
         do_login(args.state_dir, args.repo)
     elif args.cmd == "collect":
+        if not args.url:
+            print("[xiaohongshu] --url is required for collect", file=sys.stderr)
+            sys.exit(1)
         results = do_collect(args.url, args.state_dir, args.repo)
         print(json.dumps(results, ensure_ascii=False, default=str))
 

@@ -4,20 +4,14 @@ from typing import Protocol, runtime_checkable
 import json
 import re
 import subprocess
-import uuid
 
-from .models import Platform, AccountInput, AccountRecord, CorpusRecord, CollectedAccount
+from .models import Platform, AccountInput, AccountRecord, CollectedAccount
 from .runtime import RuntimeLayout
 from .adapters import normalize
 
 
 class BackendError(RuntimeError):
     pass
-
-
-def _slug_from_url(url: str) -> str:
-    url = url.rstrip("/")
-    return re.sub(r"[^a-zA-Z0-9_\-]", "_", url.split("/")[-1])[:40]
 
 
 def platform_for_url(url: str) -> Platform:
