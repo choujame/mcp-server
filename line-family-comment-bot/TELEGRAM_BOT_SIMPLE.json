@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "functionCode": "return {\n  chat_id: $input.first().input.message.chat.id,\n  message_id: $input.first().input.message.message_id,\n  text: $input.first().input.message.text\n};"
+        "functionCode": "const body = $input.first().input;\nconst message = body?.message || body;\nreturn {\n  chat_id: message?.chat?.id,\n  message_id: message?.message_id,\n  user_name: message?.from?.first_name || 'User',\n  text: message?.text || '(無訊息)',\n  timestamp: message?.date\n};"
       },
       "id": "function",
       "name": "Process Message",
@@ -28,7 +28,7 @@
       "parameters": {
         "token": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
         "chatId": "6119894493",
-        "text": "=你好！我收到了您的消息：{{$json.text}}"
+        "text": "您說：{{$json.text}}\n\n我收到了！"
       },
       "id": "telegram",
       "name": "Send Telegram Message",
