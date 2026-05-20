@@ -1,0 +1,71 @@
+{
+  "name": "Telegram Bot - Simple Working Version",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $input.first().input;\nconst message = body?.message || {};\nconst text = message?.text || '(無訊息)';\nconst chatId = message?.chat?.id;\nconst messageId = message?.message_id;\n\nreturn {\n  chat_id: chatId,\n  message_id: messageId,\n  user_name: message?.from?.first_name || 'User',\n  text: text,\n  timestamp: message?.date\n};"
+      },
+      "id": "process",
+      "name": "Process Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "botToken",
+        "botToken": "YOUR_TELEGRAM_TOKEN",
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "6119894493",
+        "text": "您說：{{$node[\"Process Message\"].json.text}}\n\n我收到您的訊息了！"
+      },
+      "id": "send_telegram",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
