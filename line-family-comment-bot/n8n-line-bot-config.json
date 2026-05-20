@@ -1,0 +1,30 @@
+{
+  "LINE_CONFIG": {
+    "CHANNEL_ACCESS_TOKEN": "YvG97w24JgWQK4knsCs+E/FdEOa8uYcqSxwzHJS+RSfMLv2A1FCB5hsUwIRFhKNAW2bIAJ4ZWc1wS1f1CJU0P3ymiqfww79I+wQtEr4L+rlj3MGA/OOnitS/dFEemkiCbWjob1J5d7itw68VFLKj8wdB04t89/1O/w1cDnyilFU=",
+    "CHANNEL_SECRET": "0754be9c82f1ccfad2a4a65b669aa894",
+    "CHANNEL_ID": "2009899010",
+    "BOT_MENTION_NAME": "家庭分身",
+    "BOT_PERSONA_NAME": "小明",
+    "ELDER_A_DISPLAY_NAME": "媽媽",
+    "ELDER_A_ADDRESS": "媽媽",
+    "ELDER_B_DISPLAY_NAME": "爸爸",
+    "ELDER_B_ADDRESS": "爸爸"
+  },
+  "WEBHOOK_CONFIG": {
+    "BASE_URL": "https://cozeworkflows.choujame.workers.dev",
+    "WEBHOOK_PATH": "/webhook/linebot"
+  },
+  "N8N_CONFIG": {
+    "BASE_URL": "http://localhost:5678",
+    "WEBHOOK_FULL_URL": "https://cozeworkflows.choujame.workers.dev/webhook/linebot"
+  },
+  "LLM_CONFIG": {
+    "TYPE": "groq",
+    "GROQ_API_KEY": "YOUR_GROQ_API_KEY_HERE",
+    "GROQ_MODEL": "mixtral-8x7b-32768",
+    "NOTE": "请将您的实际 Groq API key 填入上面的字段"
+  },
+  "MEMORY_CONFIG": {
+    "CONTEXT_WINDOW_LENGTH": 5
+  }
+}
