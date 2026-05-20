@@ -365,6 +365,246 @@ async def get_sec_filings(
     # Stringify the SEC filings
     return json.dumps(filings, indent=2)
 
+# LINE Family Comment Bot Tools
+
+@mcp.tool()
+async def verify_line_config(
+    channel_access_token: str,
+    channel_secret: str,
+    channel_id: str,
+) -> str:
+    """Verify LINE Messaging API configuration.
+
+    Args:
+        channel_access_token: LINE channel access token
+        channel_secret: LINE channel secret
+        channel_id: LINE channel ID
+
+    Returns:
+        Verification result message
+    """
+    errors = []
+
+    if not channel_access_token or len(channel_access_token) < 10:
+        errors.append("Invalid channel_access_token format")
+
+    if not channel_secret or len(channel_secret) < 10:
+        errors.append("Invalid channel_secret format")
+
+    if not channel_id or len(channel_id) < 5:
+        errors.append("Invalid channel_id format")
+
+    if errors:
+        return json.dumps({
+            "status": "invalid",
+            "errors": errors
+        }, indent=2)
+
+    return json.dumps({
+        "status": "valid",
+        "message": "LINE configuration looks valid. Credentials are properly formatted.",
+        "note": "This is basic validation. Test the webhook connection in LINE Developers console."
+    }, indent=2)
+
+
+@mcp.tool()
+async def validate_n8n_connection(n8n_base_url: str, n8n_api_key: str = "") -> str:
+    """Validate connection to n8n instance.
+
+    Args:
+        n8n_base_url: Base URL of n8n instance (e.g. http://localhost:5678)
+        n8n_api_key: Optional n8n API key for authenticated access
+
+    Returns:
+        Connection validation result
+    """
+    try:
+        if not n8n_base_url:
+            return json.dumps({
+                "status": "error",
+                "message": "n8n_base_url is required"
+            }, indent=2)
+
+        # Ensure URL has correct format
+        if not n8n_base_url.startswith(("http://", "https://")):
+            n8n_base_url = "http://" + n8n_base_url
+
+        if n8n_base_url.endswith("/"):
+            n8n_base_url = n8n_base_url[:-1]
+
+        headers = {}
+        if n8n_api_key:
+            headers["X-N8N-API-KEY"] = n8n_api_key
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{n8n_base_url}/api/health", headers=headers)
+
+            if response.status_code == 200:
+                return json.dumps({
+                    "status": "connected",
+                    "message": f"Successfully connected to n8n at {n8n_base_url}",
+                    "base_url": n8n_base_url
+                }, indent=2)
+            else:
+                return json.dumps({
+                    "status": "error",
+                    "message": f"n8n returned status code {response.status_code}",
+                    "suggestion": "Check if n8n is running and the URL is correct"
+                }, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "status": "error",
+            "message": str(e),
+            "suggestion": "Check n8n URL and network connectivity"
+        }, indent=2)
+
+
+@mcp.tool()
+async def generate_line_bot_config_template() -> str:
+    """Generate a template for LINE bot configuration.
+
+    Returns:
+        LINE bot configuration template
+    """
+    template = {
+        "line_config": {
+            "CHANNEL_ACCESS_TOKEN": "Your LINE channel access token here",
+            "CHANNEL_SECRET": "Your LINE channel secret here",
+            "CHANNEL_ID": "Your LINE channel ID here",
+            "BOT_MENTION_NAME": "Family Bot",
+            "BOT_PERSONA_NAME": "SmallChen",
+            "ELDER_A_DISPLAY_NAME": "Mom",
+            "ELDER_A_ADDRESS": "媽媽",
+            "ELDER_B_DISPLAY_NAME": "Dad",
+            "ELDER_B_ADDRESS": "爸爸"
+        },
+        "llm_config": {
+            "type": "lm_studio or google_gemini or openai_compatible",
+            "lm_studio": {
+                "base_url": "http://localhost:1234/v1",
+                "api_key": "lm-studio",
+                "model": "model-name-from-lm-studio"
+            },
+            "google_gemini": {
+                "api_key": "Your Google Gemini API key",
+                "model": "gemini-2.0-flash"
+            },
+            "openai_compatible": {
+                "base_url": "https://api.openrouter.ai/v1",
+                "api_key": "Your API key",
+                "model": "model-name"
+            }
+        },
+        "n8n_config": {
+            "webhook_url": "Will be provided by n8n after workflow setup",
+            "context_window_length": 5
+        }
+    }
+
+    return json.dumps(template, indent=2)
+
+
+@mcp.tool()
+async def get_line_bot_setup_checklist() -> str:
+    """Get the LINE bot setup checklist.
+
+    Returns:
+        Setup checklist for LINE Family Comment Bot
+    """
+    checklist = {
+        "setup_steps": [
+            {
+                "step": 1,
+                "title": "Prepare n8n",
+                "tasks": [
+                    "Install n8n locally or use n8n Cloud",
+                    "Open n8n in browser"
+                ]
+            },
+            {
+                "step": 2,
+                "title": "Import Workflow",
+                "tasks": [
+                    "Create new workflow in n8n",
+                    "Import LINE_FAMILY_COMMENT_BOT.public.json",
+                    "Do not enable yet, continue setup first"
+                ]
+            },
+            {
+                "step": 3,
+                "title": "Setup LINE Developers",
+                "tasks": [
+                    "Go to LINE Developers Console",
+                    "Create Messaging API channel",
+                    "Copy Channel Access Token",
+                    "Copy Channel Secret",
+                    "Copy Channel ID"
+                ]
+            },
+            {
+                "step": 4,
+                "title": "Configure n8n Nodes",
+                "tasks": [
+                    "Open LINE Config node in n8n",
+                    "Fill CHANNEL_ACCESS_TOKEN",
+                    "Fill CHANNEL_SECRET",
+                    "Fill CHANNEL_ID",
+                    "Set BOT_MENTION_NAME (e.g. Family Bot)",
+                    "Set BOT_PERSONA_NAME and elder names"
+                ]
+            },
+            {
+                "step": 5,
+                "title": "Setup LLM",
+                "tasks": [
+                    "Choose LLM route: LM Studio, Google Gemini, or OpenAI-compatible",
+                    "Configure OpenAI-compatible model nodes with credentials",
+                    "Test LLM connection"
+                ]
+            },
+            {
+                "step": 6,
+                "title": "Setup Webhook (Local n8n only)",
+                "tasks": [
+                    "Install and setup ngrok",
+                    "Run ngrok http 5678",
+                    "Copy production webhook URL from n8n",
+                    "Update LINE Webhook URL in LINE Developers"
+                ]
+            },
+            {
+                "step": 7,
+                "title": "Test Connection",
+                "tasks": [
+                    "Enable workflow in n8n",
+                    "Click Verify in LINE Developers",
+                    "Add bot as LINE friend",
+                    "Send test message"
+                ]
+            },
+            {
+                "step": 8,
+                "title": "Join Family Group",
+                "tasks": [
+                    "Confirm bot responds correctly",
+                    "Add bot to family LINE group",
+                    "Monitor responses"
+                ]
+            }
+        ],
+        "important_notes": [
+            "Never share CHANNEL_ACCESS_TOKEN or CHANNEL_SECRET publicly",
+            "Keep family member names private",
+            "Test as individual friend first before group",
+            "Free Ngrok URLs change on restart - use static domain for stability",
+            "Recommended context window: 5-10 messages",
+            "Bot should not be too chatty in family groups"
+        ]
+    }
+
+    return json.dumps(checklist, indent=2)
+
+
 if __name__ == "__main__":
     # Log server startup
     logger.info("Starting Financial Datasets MCP Server...")
