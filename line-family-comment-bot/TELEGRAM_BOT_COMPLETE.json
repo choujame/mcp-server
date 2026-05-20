@@ -242,7 +242,8 @@
       ]
     },
     "Simple Memory": {
-      "main": [[{"node": "Normal Chat Agent", "type": "main", "index": 0}]]
+      "main": [[{"node": "Normal Chat Agent", "type": "main", "index": 0}]],
+      "ai_memory": [[{"node": "Normal Chat Agent", "type": "ai_memory", "index": 0}]]
     },
     "Normal Chat Agent": {
       "main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]
@@ -258,9 +259,6 @@
     },
     "Wiki Tool": {
       "ai_tool": [[{"node": "Medical Search Agent", "type": "ai_tool", "index": 0}]]
-    },
-    "Simple Memory": {
-      "ai_memory": [[{"node": "Normal Chat Agent", "type": "ai_memory", "index": 0}]]
     }
   },
   "active": false,
