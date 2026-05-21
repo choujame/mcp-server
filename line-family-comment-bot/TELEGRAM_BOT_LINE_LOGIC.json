@@ -1,0 +1,230 @@
+{
+  "name": "Telegram Family Bot - LINE Logic",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst message = body?.message || {};\nconst text = message?.text || '';\nconst chat_id = message?.chat?.id;\nconst user_id = message?.from?.id;\nconst first_name = message?.from?.first_name || '對方';\nconst message_id = message?.message_id;\n\nreturn [{\n  json: {\n    text,\n    chat_id,\n    user_id,\n    first_name,\n    message_id\n  }\n}];"
+      },
+      "id": "parse_message",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY",
+              "parameterType": "fixed"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "body": "={\"messages\":[{\"role\":\"system\",\"content\":\"你是一個訊息分類器。判斷這則訊息是否與健康、醫療、身體症狀、疾病、藥物相關。\\n\\n只輸出一行 JSON，不要解釋：\\n{\\\"is_medical\\\": true 或 false, \\\"reason\\\": \\\"一句很短的繁中理由\\\"}\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0,\"max_tokens\":64}",
+        "options": {}
+      },
+      "id": "intent_judge",
+      "name": "Intent Judge",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst raw = response?.choices?.[0]?.message?.content || '';\nconst prev = $('Parse Message').first().json;\n\nlet parsed = null;\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  const match = raw.match(/\\{[\\s\\S]*\\}/);\n  if (match) {\n    try { parsed = JSON.parse(match[0]); } catch (e2) {}\n  }\n}\n\nconst is_medical = parsed && typeof parsed.is_medical === 'boolean' ? parsed.is_medical : false;\nconst reason = parsed?.reason || '';\n\nreturn [{\n  json: {\n    ...prev,\n    is_medical,\n    intent_reason: reason\n  }\n}];"
+      },
+      "id": "parse_intent",
+      "name": "Parse Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "medical-rule",
+                    "leftValue": "={{ !!$json.is_medical }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "rightValue": true
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "fallback-rule",
+                    "leftValue": "=fallback",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "fallback"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "branch_switch",
+      "name": "Branch Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY",
+              "parameterType": "fixed"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "body": "={\"messages\":[{\"role\":\"system\",\"content\":\"請一律使用台灣繁體中文回覆，禁止簡體中文。使用者名稱：{{ $json.first_name }}。\\n\\n回覆要溫暖、清楚、避免過度武斷。若涉及醫療，請提醒對方這不是正式診斷，重要症狀或用藥問題應詢問醫師或藥師。\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
+        "options": {}
+      },
+      "id": "call_groq_medical",
+      "name": "Call Groq Medical",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY",
+              "parameterType": "fixed"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "body": "={\"messages\":[{\"role\":\"system\",\"content\":\"你正在家庭 Telegram 群組中回話。你的任務是自然接話、暖場，在需要時照顧長輩情緒。\\n\\n回話原則：\\n- 用台灣繁體中文\\n- 簡短、溫暖、有人味\\n- 不要自稱 AI、助理、機器人\\n- 不要過度分析\\n- 直接自然回一句即可\\n\\n當前發話者：{{ $json.first_name }}\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
+        "options": {}
+      },
+      "id": "call_groq_normal",
+      "name": "Call Groq Normal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1100, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst message = response?.choices?.[0]?.message?.content || '好的！';\nreturn [{ json: { response: message } }];"
+      },
+      "id": "parse_response",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "botToken",
+        "botToken": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "6119894493",
+        "text": "={{ $json.response }}"
+      },
+      "id": "send_message",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1500, 300]
+    }
+  ],
+  "connections": {
+    "webhook": {
+      "main": [[{"node": "parse_message", "type": "main", "index": 0}]]
+    },
+    "parse_message": {
+      "main": [[{"node": "intent_judge", "type": "main", "index": 0}]]
+    },
+    "intent_judge": {
+      "main": [[{"node": "parse_intent", "type": "main", "index": 0}]]
+    },
+    "parse_intent": {
+      "main": [[{"node": "branch_switch", "type": "main", "index": 0}]]
+    },
+    "branch_switch": {
+      "main": [
+        [{"node": "call_groq_medical", "type": "main", "index": 0}],
+        [{"node": "call_groq_normal", "type": "main", "index": 0}]
+      ]
+    },
+    "call_groq_medical": {
+      "main": [[{"node": "parse_response", "type": "main", "index": 0}]]
+    },
+    "call_groq_normal": {
+      "main": [[{"node": "parse_response", "type": "main", "index": 0}]]
+    },
+    "parse_response": {
+      "main": [[{"node": "send_message", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 300
+  }
+}
