@@ -1,0 +1,138 @@
+{
+  "name": "Telegram Family Bot - Groq Fixed",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $input.first().input;\nconst message = body?.message || {};\nconst text = message?.text || '';\nconst chat_id = message?.chat?.id;\nconst user_id = message?.from?.id;\nconst first_name = message?.from?.first_name || 'User';\nconst message_id = message?.message_id;\n\nreturn {json: {text, chat_id, user_id, first_name, message_id, source_type: 'telegram'}};"
+      },
+      "id": "parse_message",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const text = $input.first().json.text;\nconst is_medical = /[醫藥病痛診癌感血糖壓眠頭疼]/.test(text);\nreturn {json: {is_medical}};"
+      },
+      "id": "check_medical",
+      "name": "Check Medical",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {"conditions": {"options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3}, "conditions": [{"id": "medical-rule", "leftValue": "={{ $json.is_medical }}", "operator": {"type": "boolean", "operation": "equals"}, "rightValue": true}], "combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3}, "conditions": [{"id": "default-rule", "leftValue": "=1", "operator": {"type": "string", "operation": "equals"}, "rightValue": "1"}], "combinator": "and"}}
+          ]
+        },
+        "options": {}
+      },
+      "id": "branch_switch",
+      "name": "Branch Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = $input.first().json;\nconst system_prompt = '你是 家庭助手，一個家庭群組的 AI 助手。\\n\\n用戶：' + data.first_name + '\\n訊息：' + data.text + '\\n\\n回覆原則：\\n- 使用台灣繁體中文\\n- 簡短、溫暖、自然\\n- 不要自稱 AI 或機器人\\n- 不要過度分析\\n\\n請直接回一句適當的回覆。';\n\nconst payload = {\n  messages: [\n    {\n      role: 'system',\n      content: system_prompt\n    },\n    {\n      role: 'user',\n      content: data.text\n    }\n  ],\n  model: 'llama-3.3-70b-versatile',\n  temperature: 0.7,\n  max_tokens: 256\n};\n\nreturn {json: {payload: JSON.stringify(payload), text: data.text, chat_id: data.chat_id, first_name: data.first_name}};"
+      },
+      "id": "build_normal_request",
+      "name": "Build Normal Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = $input.first().json;\nconst system_prompt = '請一律使用台灣繁體中文回覆。\\n\\n用戶：' + data.first_name + '\\n健康問題：' + data.text + '\\n\\n回覆要溫暖、清楚。若涉及醫療，請提醒對方這不是正式診斷，重要症狀應詢問醫師。';\n\nconst payload = {\n  messages: [\n    {\n      role: 'system',\n      content: system_prompt\n    },\n    {\n      role: 'user',\n      content: data.text\n    }\n  ],\n  model: 'llama-3.3-70b-versatile',\n  temperature: 0.7,\n  max_tokens: 256\n};\n\nreturn {json: {payload: JSON.stringify(payload), text: data.text, chat_id: data.chat_id, first_name: data.first_name}};"
+      },
+      "id": "build_medical_request",
+      "name": "Build Medical Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY",
+              "parameterType": "fixed"
+            }
+          ]
+        },
+        "contentType": "application/json",
+        "sendBody": true,
+        "body": "={{ JSON.parse($json.payload) }}",
+        "options": {}
+      },
+      "id": "call_groq_api",
+      "name": "Call Groq API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const response = $input.first().json;\nconst message = response?.choices?.[0]?.message?.content || '好的！';\nreturn {json: {response: message}};"
+      },
+      "id": "parse_groq_response",
+      "name": "Parse Groq Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "botToken",
+        "botToken": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "6119894493",
+        "text": "{{ $json.response }}"
+      },
+      "id": "send_message",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1500, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Parse Message", "type": "main", "index": 0}]]},
+    "Parse Message": {"main": [[{"node": "Check Medical", "type": "main", "index": 0}]]},
+    "Check Medical": {"main": [[{"node": "Branch Switch", "type": "main", "index": 0}]]},
+    "Branch Switch": {"main": [[{"node": "Build Medical Request", "type": "main", "index": 0}], [{"node": "Build Normal Request", "type": "main", "index": 0}]]},
+    "Build Normal Request": {"main": [[{"node": "Call Groq API", "type": "main", "index": 0}]]},
+    "Build Medical Request": {"main": [[{"node": "Call Groq API", "type": "main", "index": 0}]]},
+    "Call Groq API": {"main": [[{"node": "Parse Groq Response", "type": "main", "index": 0}]]},
+    "Parse Groq Response": {"main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1", "executionTimeout": 300}
+}
