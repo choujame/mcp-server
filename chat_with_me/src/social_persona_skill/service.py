@@ -25,6 +25,13 @@ def _read_oauth_token() -> Optional[str]:
                 return f.read().strip()
         except Exception:
             pass
+    token_file = os.environ.get("CLAUDE_SESSION_INGRESS_TOKEN_FILE")
+    if token_file:
+        try:
+            with open(token_file, "r") as f:
+                return f.read().strip()
+        except Exception:
+            pass
     return os.environ.get("ANTHROPIC_API_KEY")
 
 
