@@ -182,7 +182,7 @@
       "parameters": {
         "model": {
           "mode": "list",
-          "value": "gpt-4o-mini"
+          "value": "llama-3.3-70b-versatile"
         },
         "responsesApiEnabled": false,
         "options": {}
@@ -197,7 +197,7 @@
       "parameters": {
         "model": {
           "mode": "list",
-          "value": "gpt-4o-mini"
+          "value": "llama-3.3-70b-versatile"
         },
         "responsesApiEnabled": false,
         "options": {}
