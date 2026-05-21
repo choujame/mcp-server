@@ -55,6 +55,7 @@
           ]
         },
         "sendBody": true,
+        "specifyBody": "json",
         "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"你是家庭助手。用繁體中文回覆。簡短、溫暖、自然。不要自稱AI。\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
         "options": {}
       },
@@ -79,6 +80,7 @@
           ]
         },
         "sendBody": true,
+        "specifyBody": "json",
         "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"你是醫療助手。用繁體中文回覆。若涉及醫療提醒這不是診斷，重要症狀應詢問醫師。\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
         "options": {}
       },
