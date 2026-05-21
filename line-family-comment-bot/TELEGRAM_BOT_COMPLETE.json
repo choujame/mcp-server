@@ -242,11 +242,11 @@
       ]
     },
     "Simple Memory": {
-      "main": [[{"node": "Normal Chat Agent", "type": "main", "index": 0}]],
-      "ai_memory": [[{"node": "Normal Chat Agent", "type": "ai_memory", "index": 0}]]
+      "main": [[{"node": "Normal Chat Agent", "type": "main", "index": 0}]]
     },
     "Normal Chat Agent": {
-      "main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]
+      "main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]],
+      "ai_memory": [[{"node": "Simple Memory", "type": "ai_memory", "index": 0}]]
     },
     "Medical Search Agent": {
       "main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]
