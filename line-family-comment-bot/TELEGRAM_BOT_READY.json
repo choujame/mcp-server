@@ -1,0 +1,127 @@
+{
+  "name": "Telegram Family Bot - Ready",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $input.first().input;\nconst message = body?.message || {};\nconst text = message?.text || '';\nconst chat_id = message?.chat?.id;\nconst user_id = message?.from?.id;\nconst first_name = message?.from?.first_name || 'User';\nconst is_medical = /[醫藥病痛診癌感血糖壓眠頭疼]/.test(text);\nreturn {json: {text, chat_id, user_id, first_name, is_medical}};"
+      },
+      "id": "parse_message",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {"conditions": {"options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3}, "conditions": [{"id": "medical-rule", "leftValue": "={{ $json.is_medical }}", "operator": {"type": "boolean", "operation": "equals"}, "rightValue": true}], "combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3}, "conditions": [{"id": "default-rule", "leftValue": "=1", "operator": {"type": "string", "operation": "equals"}, "rightValue": "1"}], "combinator": "and"}}
+          ]
+        },
+        "options": {}
+      },
+      "id": "branch_switch",
+      "name": "Branch Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY",
+              "parameterType": "fixed"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"你是家庭助手。用繁體中文回覆。簡短、溫暖、自然。不要自稱AI。\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
+        "options": {}
+      },
+      "id": "call_groq_api",
+      "name": "Call Groq API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY",
+              "parameterType": "fixed"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"你是醫療助手。用繁體中文回覆。若涉及醫療提醒這不是診斷，重要症狀應詢問醫師。\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
+        "options": {}
+      },
+      "id": "call_groq_api_medical",
+      "name": "Call Groq API Medical",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "const response = $input.first().json;\nconst message = response?.choices?.[0]?.message?.content || '好的！';\nreturn {json: {response: message}};"
+      },
+      "id": "parse_groq_response",
+      "name": "Parse Groq Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "botToken",
+        "botToken": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "6119894493",
+        "text": "={{ $json.response }}"
+      },
+      "id": "send_message",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1100, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Parse Message", "type": "main", "index": 0}]]},
+    "Parse Message": {"main": [[{"node": "Branch Switch", "type": "main", "index": 0}]]},
+    "Branch Switch": {"main": [[{"node": "Call Groq API Medical", "type": "main", "index": 0}], [{"node": "Call Groq API", "type": "main", "index": 0}]]},
+    "Call Groq API": {"main": [[{"node": "Parse Groq Response", "type": "main", "index": 0}]]},
+    "Call Groq API Medical": {"main": [[{"node": "Parse Groq Response", "type": "main", "index": 0}]]},
+    "Parse Groq Response": {"main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1", "executionTimeout": 300}
+}
