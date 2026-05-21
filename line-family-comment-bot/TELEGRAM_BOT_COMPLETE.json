@@ -215,7 +215,7 @@
         "resource": "message",
         "operation": "sendMessage",
         "chatId": "6119894493",
-        "text": "{{ $json.output || $json.text || '好的！' }}"
+        "text": "{{ $json.response || $json.output || $json.text || '好的！' }}"
       },
       "id": "send_message",
       "name": "Send Telegram Message",
