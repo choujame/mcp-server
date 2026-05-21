@@ -1,0 +1,89 @@
+{
+  "name": "Telegram Family Bot - Final Working",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $input.first().input;\nconst message = body?.message || {};\nconst text = message?.text || '';\nconst chat_id = message?.chat?.id;\nconst user_id = message?.from?.id;\nconst first_name = message?.from?.first_name || 'User';\nconst message_id = message?.message_id;\n\nreturn {json: {text, chat_id, user_id, first_name, message_id}};"
+      },
+      "id": "parse_message",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY",
+              "parameterType": "fixed"
+            }
+          ]
+        },
+        "contentType": "application/json",
+        "sendBody": true,
+        "specifyBody": "json",
+        "body": "{\"messages\": [{\"role\": \"system\", \"content\": \"你是 家庭助手，一個家庭群組的 AI 助手。回覆原則：使用台灣繁體中文、簡短、溫暖、自然、不要自稱 AI 或機器人、不要過度分析。\"}, {\"role\": \"user\", \"content\": \"{{ $json.text }}\"}], \"model\": \"llama-3.3-70b-versatile\", \"temperature\": 0.7, \"max_tokens\": 256}",
+        "options": {}
+      },
+      "id": "call_groq_api",
+      "name": "Call Groq API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const response = $input.first().json;\nconst message = response?.choices?.[0]?.message?.content || '好的！';\nreturn {json: {response: message}};"
+      },
+      "id": "parse_groq_response",
+      "name": "Parse Groq Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "botToken",
+        "botToken": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "6119894493",
+        "text": "{{ $json.response }}"
+      },
+      "id": "send_message",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Parse Message", "type": "main", "index": 0}]]},
+    "Parse Message": {"main": [[{"node": "Call Groq API", "type": "main", "index": 0}]]},
+    "Call Groq API": {"main": [[{"node": "Parse Groq Response", "type": "main", "index": 0}]]},
+    "Parse Groq Response": {"main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1", "executionTimeout": 300}
+}
