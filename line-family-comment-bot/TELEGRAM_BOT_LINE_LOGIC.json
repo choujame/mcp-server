@@ -40,7 +40,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "body": "={\"messages\":[{\"role\":\"system\",\"content\":\"你是一個訊息分類器。判斷這則訊息是否與健康、醫療、身體症狀、疾病、藥物相關。\\n\\n只輸出一行 JSON，不要解釋：\\n{\\\"is_medical\\\": true 或 false, \\\"reason\\\": \\\"一句很短的繁中理由\\\"}\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0,\"max_tokens\":64}",
+        "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"你是一個訊息分類器。判斷這則訊息是否與健康、醫療、身體症狀、疾病、藥物相關。\\n\\n只輸出一行 JSON，不要解釋：\\n{\\\"is_medical\\\": true 或 false, \\\"reason\\\": \\\"一句很短的繁中理由\\\"}\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0,\"max_tokens\":64}",
         "options": {}
       },
       "id": "intent_judge",
@@ -133,7 +133,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "body": "={\"messages\":[{\"role\":\"system\",\"content\":\"請一律使用台灣繁體中文回覆，禁止簡體中文。使用者名稱：{{ $json.first_name }}。\\n\\n回覆要溫暖、清楚、避免過度武斷。若涉及醫療，請提醒對方這不是正式診斷，重要症狀或用藥問題應詢問醫師或藥師。\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
+        "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"請一律使用台灣繁體中文回覆，禁止簡體中文。使用者名稱：{{ $json.first_name }}。\\n\\n回覆要溫暖、清楚、避免過度武斷。若涉及醫療，請提醒對方這不是正式診斷，重要症狀或用藥問題應詢問醫師或藥師。\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
         "options": {}
       },
       "id": "call_groq_medical",
@@ -158,7 +158,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "body": "={\"messages\":[{\"role\":\"system\",\"content\":\"你正在家庭 Telegram 群組中回話。你的任務是自然接話、暖場，在需要時照顧長輩情緒。\\n\\n回話原則：\\n- 用台灣繁體中文\\n- 簡短、溫暖、有人味\\n- 不要自稱 AI、助理、機器人\\n- 不要過度分析\\n- 直接自然回一句即可\\n\\n當前發話者：{{ $json.first_name }}\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
+        "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"你正在家庭 Telegram 群組中回話。你的任務是自然接話、暖場，在需要時照顧長輩情緒。\\n\\n回話原則：\\n- 用台灣繁體中文\\n- 簡短、溫暖、有人味\\n- 不要自稱 AI、助理、機器人\\n- 不要過度分析\\n- 直接自然回一句即可\\n\\n當前發話者：{{ $json.first_name }}\"},{\"role\":\"user\",\"content\":\"{{ $json.text }}\"}],\"model\":\"llama-3.3-70b-versatile\",\"temperature\":0.7,\"max_tokens\":256}",
         "options": {}
       },
       "id": "call_groq_normal",

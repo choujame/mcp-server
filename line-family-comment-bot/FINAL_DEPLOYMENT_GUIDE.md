@@ -637,6 +637,49 @@ Bot 名稱: @cozuesg_bot
 
 ---
 
+---
+
+## 已知問題記錄
+
+### 問題：JSON Body 導入後為空
+
+**現象**: HTTP Request 節點導入 n8n 後，JSON Body 欄位顯示為空（紅色點）
+
+**原因**: JSON 檔案中 `body` 字段以 `=` 開頭（如 `="{ ... }"`），n8n 將其視為表達式而非 JSON 字串，導致 UI 顯示為空
+
+**修正**: 移除 `body` 字段前面的 `=` 號，確保直接是 JSON 字串
+
+**檔案**: `/home/user/mcp-server/line-family-comment-bot/TELEGRAM_BOT_LINE_LOGIC.json`
+
+---
+
+### 問題：所有節點導入後沒有連接線
+
+**現象**: 工作流程導入後，節點之間沒有連接線
+
+**原因**: n8n 的導入機制有時無法正確應用 JSON 中的 connections 配置
+
+**修正**: 手動在 n8n UI 中拖線連接所有節點
+
+**正確連接順序**:
+```
+Webhook → Parse Message → Intent Judge → Parse Intent → Branch Switch
+Branch Switch (輸出0) → Call Groq Medical → Parse Response → Send Telegram
+Branch Switch (輸出1) → Call Groq Normal → Parse Response → Send Telegram
+```
+
+---
+
+### 問題：Parse Message 無法正確讀取訊息文字
+
+**現象**: `is_medical` 永遠為 `false`，或文字內容為空
+
+**原因**: 使用 `$input.first().input` 讀取 webhook 數據（路徑錯誤）
+
+**修正**: 改為 `$input.first().json.body` 正確讀取 Telegram webhook 數據結構
+
+---
+
 **版本**: 1.0 - 完整路徑版本  
 **最後更新**: 2026-05-21  
 **狀態**: 生產環境就緒  
