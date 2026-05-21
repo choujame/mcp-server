@@ -114,13 +114,13 @@
                 },
                 "conditions": [
                   {
-                    "id": "text-rule",
-                    "leftValue": "=general",
+                    "id": "default-rule",
+                    "leftValue": "={{ $json.text !== null }}",
                     "operator": {
-                      "type": "string",
+                      "type": "boolean",
                       "operation": "equals"
                     },
-                    "rightValue": "general"
+                    "rightValue": true
                   }
                 ],
                 "combinator": "and"
