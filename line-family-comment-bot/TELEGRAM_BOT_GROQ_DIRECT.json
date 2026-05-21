@@ -79,20 +79,30 @@
           ]
         },
         "contentType": "application/json",
-        "body": {
-          "messages": [
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
             {
-              "role": "system",
-              "content": "You are a helpful assistant. Always respond in Traditional Chinese."
+              "name": "messages",
+              "value": "[{\"role\": \"system\", \"content\": \"You are a helpful assistant. Always respond in Traditional Chinese.\"}, {\"role\": \"user\", \"content\": \"{{ $json.text }}\"}]",
+              "parameterType": "json"
             },
             {
-              "role": "user",
-              "content": "{{ $json.text }}"
+              "name": "model",
+              "value": "llama-3.3-70b-versatile",
+              "parameterType": "string"
+            },
+            {
+              "name": "temperature",
+              "value": "0.7",
+              "parameterType": "number"
+            },
+            {
+              "name": "max_tokens",
+              "value": "256",
+              "parameterType": "number"
             }
-          ],
-          "model": "llama-3.3-70b-versatile",
-          "temperature": 0.7,
-          "max_tokens": 256
+          ]
         },
         "options": {}
       },
