@@ -1,0 +1,104 @@
+{
+  "name": "Telegram Family Bot - Simple Fixed",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $input.first().input;\nconst message = body?.message || {};\nconst text = message?.text || '';\nconst chat_id = message?.chat?.id;\nconst user_id = message?.from?.id;\nconst first_name = message?.from?.first_name || 'User';\nconst message_id = message?.message_id;\n\nreturn {\n  json: {\n    text,\n    chat_id,\n    user_id,\n    first_name,\n    message_id,\n    source_type: 'telegram'\n  }\n};"
+      },
+      "id": "parse_message",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ 'telegram:' + $json.chat_id }}",
+        "contextWindowLength": 5
+      },
+      "id": "simple_memory",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=你是 家庭助手，一個家庭群組的 AI 助手。\n\n用戶：{{ $json.first_name }}\n訊息：{{ $json.text }}\n\n回覆原則：\n- 使用台灣繁體中文\n- 簡短、溫暖、自然\n- 不要自稱 AI 或機器人\n- 不要過度分析\n\n請直接回一句適當的回覆。"
+      },
+      "id": "normal_chat_agent",
+      "name": "Normal Chat Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "model": {
+          "mode": "list",
+          "value": "llama-3.3-70b-versatile"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "llm_chat",
+      "name": "LLM Model - Chat",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [700, 500]
+    },
+    {
+      "parameters": {
+        "authentication": "botToken",
+        "botToken": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "6119894493",
+        "text": "{{ $json.response || $json.text || '好的！' }}"
+      },
+      "id": "send_message",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Parse Message", "type": "main", "index": 0}]]
+    },
+    "Parse Message": {
+      "main": [[{"node": "Simple Memory", "type": "main", "index": 0}]]
+    },
+    "Simple Memory": {
+      "main": [[{"node": "Normal Chat Agent", "type": "main", "index": 0}]],
+      "ai_memory": [[{"node": "Normal Chat Agent", "type": "ai_memory", "index": 0}]]
+    },
+    "Normal Chat Agent": {
+      "main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]
+    },
+    "LLM Model - Chat": {
+      "ai_languageModel": [[{"node": "Normal Chat Agent", "type": "ai_languageModel", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 300
+  }
+}
