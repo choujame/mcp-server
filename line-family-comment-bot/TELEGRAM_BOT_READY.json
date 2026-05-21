@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "functionCode": "const body = $input.first().input;\nconst message = body?.message || {};\nconst text = message?.text || '';\nconst chat_id = message?.chat?.id;\nconst user_id = message?.from?.id;\nconst first_name = message?.from?.first_name || 'User';\nconst is_medical = /[醫藥病痛診癌感血糖壓眠頭疼]/.test(text);\nreturn {json: {text, chat_id, user_id, first_name, is_medical}};"
+        "functionCode": "const body = $input.first().input;\nconst message = body?.message || {};\nconst text = message?.text || '';\nconst chat_id = message?.chat?.id;\nconst user_id = message?.from?.id;\nconst first_name = message?.from?.first_name || 'User';\nconst message_id = message?.message_id;\nconst is_medical = /[醫藥病痛診癌感血糖壓眠頭疼]/.test(text);\n\nreturn {json: {text, chat_id, user_id, first_name, message_id, is_medical, source_type: 'telegram'}};"
       },
       "id": "parse_message",
       "name": "Parse Message",
@@ -117,13 +117,83 @@
     }
   ],
   "connections": {
-    "webhook": {"main": [[{"node": "parse_message", "type": "main", "index": 0}]]},
-    "parse_message": {"main": [[{"node": "branch_switch", "type": "main", "index": 0}]]},
-    "branch_switch": {"main": [[{"node": "call_groq_api_medical", "type": "main", "index": 0}], [{"node": "call_groq_api", "type": "main", "index": 0}]]},
-    "call_groq_api": {"main": [[{"node": "parse_groq_response", "type": "main", "index": 0}]]},
-    "call_groq_api_medical": {"main": [[{"node": "parse_groq_response", "type": "main", "index": 0}]]},
-    "parse_groq_response": {"main": [[{"node": "send_message", "type": "main", "index": 0}]]}
+    "webhook": {
+      "main": [
+        [
+          {
+            "node": "parse_message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse_message": {
+      "main": [
+        [
+          {
+            "node": "branch_switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "branch_switch": {
+      "main": [
+        [
+          {
+            "node": "call_groq_api_medical",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "call_groq_api",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "call_groq_api": {
+      "main": [
+        [
+          {
+            "node": "parse_groq_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "call_groq_api_medical": {
+      "main": [
+        [
+          {
+            "node": "parse_groq_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse_groq_response": {
+      "main": [
+        [
+          {
+            "node": "send_message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "active": false,
-  "settings": {"executionOrder": "v1", "executionTimeout": 300}
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 300
+  }
 }
