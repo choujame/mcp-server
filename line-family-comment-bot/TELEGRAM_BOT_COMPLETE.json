@@ -18,24 +18,9 @@
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "bot-token",
-              "name": "BOT_TOKEN",
-              "type": "string",
-              "value": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI"
-            },
-            {
-              "id": "chat-id",
-              "name": "CHAT_ID",
-              "type": "string",
-              "value": "6119894493"
-            },
-            {
-              "id": "bot-name",
-              "name": "BOT_PERSONA_NAME",
-              "type": "string",
-              "value": "家庭助手"
-            }
+            {"id": "bot-token", "name": "BOT_TOKEN", "type": "string", "value": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI"},
+            {"id": "chat-id", "name": "CHAT_ID", "type": "string", "value": "6119894493"},
+            {"id": "bot-name", "name": "BOT_PERSONA_NAME", "type": "string", "value": "家庭助手"}
           ]
         },
         "options": {}
@@ -48,7 +33,7 @@
     },
     {
       "parameters": {
-        "functionCode": "const body = $input.first().input;\nconst message = body?.message || {};\nconst text = message?.text || '';\nconst chat_id = message?.chat?.id;\nconst user_id = message?.from?.id;\nconst first_name = message?.from?.first_name || 'User';\nconst message_id = message?.message_id;\nconst has_photo = !!message?.photo;\nconst is_medical = /[醫藥病痛診癌感血糖壓眠頭疼]/.test(text);\n\nreturn {\n  json: {\n    text,\n    chat_id,\n    user_id,\n    first_name,\n    message_id,\n    has_photo,\n    is_medical,\n    source_type: 'telegram'\n  }\n};"
+        "functionCode": "const body = $input.first().input;\nconst message = body?.message || {};\nconst text = message?.text || '';\nconst chat_id = message?.chat?.id;\nconst user_id = message?.from?.id;\nconst first_name = message?.from?.first_name || 'User';\nconst message_id = message?.message_id;\nconst has_photo = !!message?.photo;\nconst is_medical = /[醫藥病痛診癌感血糖壓眠頭疼]/.test(text);\n\nreturn {json: {text, chat_id, user_id, first_name, message_id, has_photo, is_medical, source_type: 'telegram'}};"
       },
       "id": "parse_message",
       "name": "Parse Message",
@@ -60,72 +45,9 @@
       "parameters": {
         "rules": {
           "values": [
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "loose",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "photo-rule",
-                    "leftValue": "={{ !!$json.has_photo }}",
-                    "operator": {
-                      "type": "boolean",
-                      "operation": "equals"
-                    },
-                    "rightValue": true
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "loose",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "medical-rule",
-                    "leftValue": "={{ !!$json.is_medical }}",
-                    "operator": {
-                      "type": "boolean",
-                      "operation": "equals"
-                    },
-                    "rightValue": true
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "loose",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "default-rule",
-                    "leftValue": "={{ $json.text !== null }}",
-                    "operator": {
-                      "type": "boolean",
-                      "operation": "equals"
-                    },
-                    "rightValue": true
-                  }
-                ],
-                "combinator": "and"
-              }
-            }
+            {"conditions": {"options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3}, "conditions": [{"id": "photo-rule", "leftValue": "={{ !!$json.has_photo }}", "operator": {"type": "boolean", "operation": "equals"}, "rightValue": true}], "combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3}, "conditions": [{"id": "medical-rule", "leftValue": "={{ !!$json.is_medical }}", "operator": {"type": "boolean", "operation": "equals"}, "rightValue": true}], "combinator": "and"}},
+            {"conditions": {"options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3}, "conditions": [{"id": "text-rule", "leftValue": "={{ $json.text !== null }}", "operator": {"type": "boolean", "operation": "equals"}, "rightValue": true}], "combinator": "and"}}
           ]
         },
         "options": {}
@@ -137,11 +59,7 @@
       "position": [700, 300]
     },
     {
-      "parameters": {
-        "sessionIdType": "customKey",
-        "sessionKey": "={{ 'telegram:' + $json.chat_id }}",
-        "contextWindowLength": 5
-      },
+      "parameters": {"sessionIdType": "customKey", "sessionKey": "={{ 'telegram:' + $json.chat_id }}", "contextWindowLength": 5},
       "id": "simple_memory",
       "name": "Simple Memory",
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
@@ -149,10 +67,7 @@
       "position": [900, 300]
     },
     {
-      "parameters": {
-        "promptType": "define",
-        "text": "=你是 家庭助手，一個家庭群組的 AI 助手。\n\n用戶：{{ $json.first_name }}\n訊息：{{ $json.text }}\n\n回覆原則：\n- 使用台灣繁體中文\n- 簡短、溫暖、自然\n- 不要自稱 AI 或機器人\n- 不要過度分析\n\n請直接回一句適當的回覆。"
-      },
+      "parameters": {"promptType": "define", "text": "=你是 家庭助手，一個家庭群組的 AI 助手。\n\n用戶：{{ $json.first_name }}\n訊息：{{ $json.text }}\n\n回覆原則：\n- 使用台灣繁體中文\n- 簡短、溫暖、自然\n- 不要自稱 AI 或機器人\n- 不要過度分析\n\n請直接回一句適當的回覆。"},
       "id": "normal_chat_agent",
       "name": "Normal Chat Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -160,10 +75,7 @@
       "position": [1100, 300]
     },
     {
-      "parameters": {
-        "promptType": "define",
-        "text": "=請一律使用台灣繁體中文回覆。\n\n用戶：{{ $json.first_name }}\n健康問題：{{ $json.text }}\n\n回覆要溫暖、清楚。若涉及醫療，請提醒對方這不是正式診斷，重要症狀應詢問醫師。可使用工具查詢相關資訊。"
-      },
+      "parameters": {"promptType": "define", "text": "=請一律使用台灣繁體中文回覆。\n\n用戶：{{ $json.first_name }}\n健康問題：{{ $json.text }}\n\n回覆要溫暖、清楚。若涉及醫療，請提醒對方這不是正式診斷，重要症狀應詢問醫師。可使用工具查詢相關資訊。"},
       "id": "medical_agent",
       "name": "Medical Search Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -179,14 +91,7 @@
       "position": [700, 500]
     },
     {
-      "parameters": {
-        "model": {
-          "mode": "list",
-          "value": "llama-3.3-70b-versatile"
-        },
-        "responsesApiEnabled": false,
-        "options": {}
-      },
+      "parameters": {"model": {"mode": "list", "value": "llama-3.3-70b-versatile"}, "responsesApiEnabled": false, "options": {}},
       "id": "llm_chat",
       "name": "LLM Model - Chat",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
@@ -194,14 +99,7 @@
       "position": [1100, 500]
     },
     {
-      "parameters": {
-        "model": {
-          "mode": "list",
-          "value": "llama-3.3-70b-versatile"
-        },
-        "responsesApiEnabled": false,
-        "options": {}
-      },
+      "parameters": {"model": {"mode": "list", "value": "llama-3.3-70b-versatile"}, "responsesApiEnabled": false, "options": {}},
       "id": "llm_medical",
       "name": "LLM Model - Medical",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
@@ -209,14 +107,7 @@
       "position": [1100, 650]
     },
     {
-      "parameters": {
-        "authentication": "botToken",
-        "botToken": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI",
-        "resource": "message",
-        "operation": "sendMessage",
-        "chatId": "6119894493",
-        "text": "{{ $json.response || $json.output || $json.text || '好的！' }}"
-      },
+      "parameters": {"authentication": "botToken", "botToken": "8982238347:AAEvvIrMe_o8XifY6LGxQPRLBGCNNHlQBRI", "resource": "message", "operation": "sendMessage", "chatId": "6119894493", "text": "{{ $json.response || $json.output || $json.text || '好的！' }}"},
       "id": "send_message",
       "name": "Send Telegram Message",
       "type": "n8n-nodes-base.telegram",
@@ -225,45 +116,17 @@
     }
   ],
   "connections": {
-    "Webhook": {
-      "main": [[{"node": "Telegram Config", "type": "main", "index": 0}]]
-    },
-    "Telegram Config": {
-      "main": [[{"node": "Parse Message", "type": "main", "index": 0}]]
-    },
-    "Parse Message": {
-      "main": [[{"node": "Branch Switch", "type": "main", "index": 0}]]
-    },
-    "Branch Switch": {
-      "main": [
-        [{"node": "Simple Memory", "type": "main", "index": 0}],
-        [{"node": "Medical Search Agent", "type": "main", "index": 0}],
-        [{"node": "Simple Memory", "type": "main", "index": 0}]
-      ]
-    },
-    "Simple Memory": {
-      "main": [[{"node": "Normal Chat Agent", "type": "main", "index": 0}]]
-    },
-    "Normal Chat Agent": {
-      "main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]],
-      "ai_memory": [[{"node": "Simple Memory", "type": "ai_memory", "index": 0}]]
-    },
-    "Medical Search Agent": {
-      "main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]
-    },
-    "LLM Model - Chat": {
-      "ai_languageModel": [[{"node": "Normal Chat Agent", "type": "ai_languageModel", "index": 0}]]
-    },
-    "LLM Model - Medical": {
-      "ai_languageModel": [[{"node": "Medical Search Agent", "type": "ai_languageModel", "index": 0}]]
-    },
-    "Wiki Tool": {
-      "ai_tool": [[{"node": "Medical Search Agent", "type": "ai_tool", "index": 0}]]
-    }
+    "Webhook": {"main": [[{"node": "Telegram Config", "type": "main", "index": 0}]]},
+    "Telegram Config": {"main": [[{"node": "Parse Message", "type": "main", "index": 0}]]},
+    "Parse Message": {"main": [[{"node": "Branch Switch", "type": "main", "index": 0}]]},
+    "Branch Switch": {"main": [[{"node": "Simple Memory", "type": "main", "index": 0}], [{"node": "Medical Search Agent", "type": "main", "index": 0}], [{"node": "Simple Memory", "type": "main", "index": 0}]]},
+    "Simple Memory": {"main": [[{"node": "Normal Chat Agent", "type": "main", "index": 0}]], "ai_memory": [[{"node": "Normal Chat Agent", "type": "ai_memory", "index": 0}]]},
+    "Normal Chat Agent": {"main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]},
+    "Medical Search Agent": {"main": [[{"node": "Send Telegram Message", "type": "main", "index": 0}]]},
+    "LLM Model - Chat": {"ai_languageModel": [[{"node": "Normal Chat Agent", "type": "ai_languageModel", "index": 0}]]},
+    "LLM Model - Medical": {"ai_languageModel": [[{"node": "Medical Search Agent", "type": "ai_languageModel", "index": 0}]]},
+    "Wiki Tool": {"ai_tool": [[{"node": "Medical Search Agent", "type": "ai_tool", "index": 0}]]}
   },
   "active": false,
-  "settings": {
-    "executionOrder": "v1",
-    "executionTimeout": 300
-  }
+  "settings": {"executionOrder": "v1", "executionTimeout": 300}
 }
