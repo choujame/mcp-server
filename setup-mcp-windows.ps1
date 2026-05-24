@@ -1,37 +1,39 @@
-# Taiwan Legal MCP Server - Windows 設定腳本
-# 在 PowerShell 中執行此腳本即可完成設定
+# Taiwan Legal MCP Server - Windows setup script
+# Run in PowerShell: powershell -ExecutionPolicy Bypass -File setup-mcp-windows.ps1
 
 $projectPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-$pythonPath = Join-Path $projectPath ".venv\Scripts\python.exe"
-$claudeDir = Join-Path $env:USERPROFILE ".claude"
+$pythonPath  = Join-Path $projectPath ".venv\Scripts\python.exe"
+$claudeDir   = Join-Path $env:USERPROFILE ".claude"
 $settingsPath = Join-Path $claudeDir "settings.json"
 
-# 建立 .claude 目錄
 New-Item -ItemType Directory -Force -Path $claudeDir | Out-Null
 
-# 讀取現有設定（若存在）
-$settings = @{}
+$mcpEntry = @"
+{
+  "mcpServers": {
+    "taiwan-legal-db": {
+      "command": "$($pythonPath -replace '\\','\\\\',2)",
+      "args": ["-m", "mcp_server.server"],
+      "cwd": "$($projectPath -replace '\\','\\\\',2)"
+    }
+  }
+}
+"@
+
+# Merge with existing settings if present
 if (Test-Path $settingsPath) {
-    $settings = Get-Content $settingsPath -Raw | ConvertFrom-Json -AsHashtable
+    $existing = Get-Content $settingsPath -Raw | ConvertFrom-Json
+    $newEntry  = $mcpEntry | ConvertFrom-Json
+
+    if (-not ($existing | Get-Member -Name mcpServers -MemberType NoteProperty)) {
+        $existing | Add-Member -Name mcpServers -MemberType NoteProperty -Value @{}
+    }
+    $existing.mcpServers | Add-Member -Name "taiwan-legal-db" -MemberType NoteProperty -Value $newEntry.mcpServers."taiwan-legal-db" -Force
+    $existing | ConvertTo-Json -Depth 10 | Out-File -FilePath $settingsPath -Encoding utf8
+} else {
+    $mcpEntry | Out-File -FilePath $settingsPath -Encoding utf8
 }
 
-# 加入 MCP Server
-if (-not $settings.ContainsKey("mcpServers")) {
-    $settings["mcpServers"] = @{}
-}
-$settings["mcpServers"]["taiwan-legal-db"] = @{
-    command = $pythonPath
-    args    = @("-m", "mcp_server.server")
-    cwd     = $projectPath
-}
-
-# 寫入設定檔
-$settings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsPath -Encoding UTF8
-
-Write-Host ""
-Write-Host "✓ 設定完成！" -ForegroundColor Green
-Write-Host "  設定檔：$settingsPath"
-Write-Host "  Python：$pythonPath"
-Write-Host "  專案：$projectPath"
-Write-Host ""
-Write-Host "請重新啟動 Claude Desktop，然後在 Code 模式開新 session 測試。"
+Write-Host "Done: $settingsPath"
+Write-Host "Python: $pythonPath"
+Write-Host "Project: $projectPath"
