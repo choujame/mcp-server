@@ -1,39 +1,29 @@
 # Taiwan Legal MCP Server - Windows setup script
-# Run in PowerShell: powershell -ExecutionPolicy Bypass -File setup-mcp-windows.ps1
-
 $projectPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-$pythonPath  = Join-Path $projectPath ".venv\Scripts\python.exe"
-$claudeDir   = Join-Path $env:USERPROFILE ".claude"
-$settingsPath = Join-Path $claudeDir "settings.json"
+$python = Join-Path $projectPath ".venv\Scripts\python.exe"
 
-New-Item -ItemType Directory -Force -Path $claudeDir | Out-Null
+& $python -c @"
+import json, os, sys
 
-$mcpEntry = @"
-{
-  "mcpServers": {
-    "taiwan-legal-db": {
-      "command": "$($pythonPath -replace '\\','\\\\',2)",
-      "args": ["-m", "mcp_server.server"],
-      "cwd": "$($projectPath -replace '\\','\\\\',2)"
-    }
-  }
+project = r'$projectPath'
+python  = r'$python'
+path    = os.path.join(os.environ['USERPROFILE'], '.claude', 'settings.json')
+os.makedirs(os.path.dirname(path), exist_ok=True)
+
+settings = {}
+if os.path.exists(path):
+    try:
+        settings = json.loads(open(path, encoding='utf-8').read())
+    except Exception:
+        pass
+
+settings.setdefault('mcpServers', {})['taiwan-legal-db'] = {
+    'command': python,
+    'args': ['-m', 'mcp_server.server'],
+    'cwd': project
 }
+
+open(path, 'w', encoding='utf-8').write(json.dumps(settings, indent=2, ensure_ascii=False))
+print('Done:', path)
+print('Python:', python)
 "@
-
-# Merge with existing settings if present
-if (Test-Path $settingsPath) {
-    $existing = Get-Content $settingsPath -Raw | ConvertFrom-Json
-    $newEntry  = $mcpEntry | ConvertFrom-Json
-
-    if (-not ($existing | Get-Member -Name mcpServers -MemberType NoteProperty)) {
-        $existing | Add-Member -Name mcpServers -MemberType NoteProperty -Value @{}
-    }
-    $existing.mcpServers | Add-Member -Name "taiwan-legal-db" -MemberType NoteProperty -Value $newEntry.mcpServers."taiwan-legal-db" -Force
-    $existing | ConvertTo-Json -Depth 10 | Out-File -FilePath $settingsPath -Encoding utf8
-} else {
-    $mcpEntry | Out-File -FilePath $settingsPath -Encoding utf8
-}
-
-Write-Host "Done: $settingsPath"
-Write-Host "Python: $pythonPath"
-Write-Host "Project: $projectPath"
