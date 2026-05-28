@@ -536,11 +536,13 @@ async def apify_scrape(url: str, max_pages: int = 3) -> str:
 
 
 if __name__ == "__main__":
-    # Log server startup
-    logger.info("Starting Financial Datasets MCP Server...")
+    load_dotenv()
+    transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    port = int(os.environ.get("PORT", 8000))
 
-    # Initialize and run the server
-    mcp.run(transport="stdio")
+    logger.info("Starting MCP Server (transport=%s)...", transport)
 
-    # This line won't be reached during normal operation
-    logger.info("Server stopped")
+    if transport == "sse":
+        mcp.run(transport="sse", host="0.0.0.0", port=port)
+    else:
+        mcp.run(transport="stdio")
