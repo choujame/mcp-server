@@ -3,6 +3,10 @@ import os
 import httpx
 import logging
 import sys
+import subprocess
+import shutil
+import asyncio
+from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 
@@ -364,6 +368,186 @@ async def get_sec_filings(
 
     # Stringify the SEC filings
     return json.dumps(filings, indent=2)
+
+# ── AgEnD: Multi-agent fleet tools ──────────────────────────────────────────
+# Mirrors the peer-to-peer MCP tools from github.com/suzuke/AgEnD.
+# Agents discover, message, and manage each other through tmux sessions.
+
+AGEND_PREFIX = "agend-"  # tmux session name prefix
+
+
+def _tmux_available() -> bool:
+    return shutil.which("tmux") is not None
+
+
+def _run(cmd: list[str]) -> tuple[int, str, str]:
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    return r.returncode, r.stdout.strip(), r.stderr.strip()
+
+
+@mcp.tool()
+async def agend_list_agents() -> str:
+    """List all running AgEnD agent tmux sessions.
+
+    Returns a JSON array of agent info objects with name, pid, and created fields.
+    """
+    if not _tmux_available():
+        return json.dumps({"error": "tmux is not installed"})
+
+    rc, out, err = _run(["tmux", "list-sessions", "-F",
+                         "#{session_name}\t#{session_id}\t#{session_created}"])
+    if rc != 0:
+        if "no server running" in err:
+            return json.dumps([])
+        return json.dumps({"error": err})
+
+    agents = []
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3 and parts[0].startswith(AGEND_PREFIX):
+            agents.append({
+                "name": parts[0][len(AGEND_PREFIX):],
+                "session": parts[0],
+                "id": parts[1],
+                "created": parts[2],
+            })
+    return json.dumps(agents, indent=2)
+
+
+@mcp.tool()
+async def agend_start_agent(
+    name: str,
+    project_path: str,
+    cli: str = "claude",
+) -> str:
+    """Start a new agent in an isolated tmux session.
+
+    Args:
+        name: Unique agent name (e.g. "backend", "frontend")
+        project_path: Absolute path to the project directory
+        cli: CLI backend to use — claude | gemini | codex | opencode (default: claude)
+    """
+    if not _tmux_available():
+        return json.dumps({"error": "tmux is not installed"})
+
+    session = f"{AGEND_PREFIX}{name}"
+    rc, _, _ = _run(["tmux", "has-session", "-t", session])
+    if rc == 0:
+        return json.dumps({"error": f"Agent '{name}' is already running"})
+
+    path = Path(project_path).expanduser().resolve()
+    if not path.is_dir():
+        return json.dumps({"error": f"Directory not found: {project_path}"})
+
+    cli_map = {
+        "claude": "claude",
+        "gemini": "gemini",
+        "codex": "codex",
+        "opencode": "opencode",
+    }
+    cmd = cli_map.get(cli, cli)
+
+    rc, _, err = _run([
+        "tmux", "new-session", "-d",
+        "-s", session,
+        "-c", str(path),
+        cmd,
+    ])
+    if rc != 0:
+        return json.dumps({"error": err})
+    return json.dumps({"status": "started", "agent": name, "session": session, "cli": cmd})
+
+
+@mcp.tool()
+async def agend_send_message(name: str, message: str) -> str:
+    """Send a message / prompt to a running agent's tmux session.
+
+    Args:
+        name: Agent name (as given to agend_start_agent)
+        message: Text to send (simulates keyboard input)
+    """
+    if not _tmux_available():
+        return json.dumps({"error": "tmux is not installed"})
+
+    session = f"{AGEND_PREFIX}{name}"
+    rc, _, _ = _run(["tmux", "has-session", "-t", session])
+    if rc != 0:
+        return json.dumps({"error": f"Agent '{name}' is not running"})
+
+    escaped = message.replace("'", "'\\''")
+    rc, _, err = _run(["tmux", "send-keys", "-t", session, message, "Enter"])
+    if rc != 0:
+        return json.dumps({"error": err})
+    return json.dumps({"status": "sent", "agent": name})
+
+
+@mcp.tool()
+async def agend_get_output(name: str, lines: int = 50) -> str:
+    """Capture recent terminal output from an agent's tmux session.
+
+    Args:
+        name: Agent name
+        lines: Number of lines to capture (default: 50)
+    """
+    if not _tmux_available():
+        return json.dumps({"error": "tmux is not installed"})
+
+    session = f"{AGEND_PREFIX}{name}"
+    rc, _, _ = _run(["tmux", "has-session", "-t", session])
+    if rc != 0:
+        return json.dumps({"error": f"Agent '{name}' is not running"})
+
+    rc, out, err = _run(["tmux", "capture-pane", "-p", "-t", session,
+                          "-S", f"-{lines}"])
+    if rc != 0:
+        return json.dumps({"error": err})
+    return json.dumps({"agent": name, "output": out})
+
+
+@mcp.tool()
+async def agend_stop_agent(name: str) -> str:
+    """Stop a running agent's tmux session.
+
+    Args:
+        name: Agent name to stop
+    """
+    if not _tmux_available():
+        return json.dumps({"error": "tmux is not installed"})
+
+    session = f"{AGEND_PREFIX}{name}"
+    rc, _, _ = _run(["tmux", "has-session", "-t", session])
+    if rc != 0:
+        return json.dumps({"error": f"Agent '{name}' is not running"})
+
+    rc, _, err = _run(["tmux", "kill-session", "-t", session])
+    if rc != 0:
+        return json.dumps({"error": err})
+    return json.dumps({"status": "stopped", "agent": name})
+
+
+@mcp.tool()
+async def agend_broadcast(message: str) -> str:
+    """Broadcast a message to all running AgEnD agent sessions.
+
+    Args:
+        message: Text to send to every agent
+    """
+    if not _tmux_available():
+        return json.dumps({"error": "tmux is not installed"})
+
+    agents_json = await agend_list_agents()
+    agents = json.loads(agents_json)
+    if isinstance(agents, dict) and "error" in agents:
+        return agents_json
+    if not agents:
+        return json.dumps({"status": "no agents running"})
+
+    results = []
+    for agent in agents:
+        rc, _, err = _run(["tmux", "send-keys", "-t", agent["session"], message, "Enter"])
+        results.append({"agent": agent["name"], "ok": rc == 0, "error": err if rc != 0 else None})
+    return json.dumps(results, indent=2)
+
 
 if __name__ == "__main__":
     # Log server startup
