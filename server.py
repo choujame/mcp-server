@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import httpx
@@ -19,6 +20,8 @@ mcp = FastMCP("financial-datasets")
 
 # Constants
 FINANCIAL_DATASETS_API_BASE = "https://api.financialdatasets.ai"
+FIRECRAWL_API_BASE = "https://api.firecrawl.dev/v1"
+APIFY_API_BASE = "https://api.apify.com/v2"
 
 
 # Helper function to make API requests
@@ -365,12 +368,181 @@ async def get_sec_filings(
     # Stringify the SEC filings
     return json.dumps(filings, indent=2)
 
+@mcp.tool()
+async def firecrawl_scrape(url: str, formats: list[str] | None = None) -> str:
+    """Scrape a single webpage using Firecrawl and return clean content (markdown by default).
+
+    Args:
+        url: The URL to scrape
+        formats: Output formats to request, e.g. ["markdown"], ["html"], ["links"] (default: ["markdown"])
+    """
+    load_dotenv()
+    api_key = os.environ.get("FIRECRAWL_API_KEY")
+    if not api_key:
+        return "Error: FIRECRAWL_API_KEY not set in environment"
+
+    if formats is None:
+        formats = ["markdown"]
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {"url": url, "formats": formats}
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                f"{FIRECRAWL_API_BASE}/scrape",
+                json=payload,
+                headers=headers,
+                timeout=60.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+            if not data.get("success"):
+                return f"Firecrawl error: {json.dumps(data)}"
+            page = data.get("data", {})
+            meta = page.get("metadata", {})
+            result = {
+                "url": url,
+                "title": meta.get("title", ""),
+                "description": meta.get("description", ""),
+            }
+            for fmt in formats:
+                if fmt in page:
+                    result[fmt] = page[fmt]
+            return json.dumps(result, indent=2)
+        except Exception as e:
+            return f"Error scraping {url}: {str(e)}"
+
+
+@mcp.tool()
+async def firecrawl_crawl(url: str, limit: int = 10) -> str:
+    """Crawl an entire website using Firecrawl and return clean markdown from multiple pages.
+
+    Args:
+        url: The root URL to start crawling from
+        limit: Maximum number of pages to crawl (default: 10)
+    """
+    load_dotenv()
+    api_key = os.environ.get("FIRECRAWL_API_KEY")
+    if not api_key:
+        return "Error: FIRECRAWL_API_KEY not set in environment"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {"url": url, "limit": limit, "scrapeOptions": {"formats": ["markdown"]}}
+
+    async with httpx.AsyncClient() as client:
+        try:
+            start_resp = await client.post(
+                f"{FIRECRAWL_API_BASE}/crawl",
+                json=payload,
+                headers=headers,
+                timeout=30.0,
+            )
+            start_resp.raise_for_status()
+            start_data = start_resp.json()
+            if not start_data.get("success"):
+                return f"Firecrawl crawl error: {json.dumps(start_data)}"
+
+            job_id = start_data.get("id")
+            for _ in range(60):
+                await asyncio.sleep(2)
+                poll_resp = await client.get(
+                    f"{FIRECRAWL_API_BASE}/crawl/{job_id}",
+                    headers=headers,
+                    timeout=30.0,
+                )
+                poll_resp.raise_for_status()
+                poll_data = poll_resp.json()
+                status = poll_data.get("status")
+                if status == "completed":
+                    pages = poll_data.get("data", [])
+                    results = [
+                        {
+                            "url": p.get("metadata", {}).get("sourceURL", ""),
+                            "title": p.get("metadata", {}).get("title", ""),
+                            "markdown": p.get("markdown", ""),
+                        }
+                        for p in pages
+                    ]
+                    return json.dumps(results, indent=2)
+                elif status == "failed":
+                    return f"Crawl job failed: {json.dumps(poll_data)}"
+
+            return f"Crawl job timed out after 120s (job_id={job_id})"
+        except Exception as e:
+            return f"Error crawling {url}: {str(e)}"
+
+
+@mcp.tool()
+async def apify_scrape(url: str, max_pages: int = 3) -> str:
+    """Scrape a webpage (or small site) using Apify's Website Content Crawler actor.
+    Returns clean text and markdown extracted by a professional crawler.
+
+    Args:
+        url: The URL to scrape
+        max_pages: Maximum number of pages to crawl from that URL (default: 3)
+    """
+    load_dotenv()
+    api_token = os.environ.get("APIFY_API_TOKEN")
+    if not api_token:
+        return "Error: APIFY_API_TOKEN not set in environment"
+
+    auth_param = f"token={api_token}"
+    payload = {
+        "startUrls": [{"url": url}],
+        "maxCrawlPages": max_pages,
+        "crawlerType": "cheerio",
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            run_resp = await client.post(
+                f"{APIFY_API_BASE}/acts/apify~website-content-crawler/runs?{auth_param}",
+                json=payload,
+                timeout=30.0,
+            )
+            run_resp.raise_for_status()
+            run_data = run_resp.json().get("data", {})
+            run_id = run_data.get("id")
+            dataset_id = run_data.get("defaultDatasetId")
+
+            for _ in range(60):
+                await asyncio.sleep(3)
+                status_resp = await client.get(
+                    f"{APIFY_API_BASE}/actor-runs/{run_id}?{auth_param}",
+                    timeout=30.0,
+                )
+                status_resp.raise_for_status()
+                run_status = status_resp.json().get("data", {}).get("status")
+                if run_status == "SUCCEEDED":
+                    items_resp = await client.get(
+                        f"{APIFY_API_BASE}/datasets/{dataset_id}/items?{auth_param}&fields=url,title,text,markdown",
+                        timeout=30.0,
+                    )
+                    items_resp.raise_for_status()
+                    return json.dumps(items_resp.json(), indent=2)
+                elif run_status in ("FAILED", "ABORTED", "TIMED-OUT"):
+                    return f"Apify run {run_status} (run_id={run_id})"
+
+            return f"Apify run timed out after 180s (run_id={run_id})"
+        except Exception as e:
+            return f"Error scraping {url} with Apify: {str(e)}"
+
+
 if __name__ == "__main__":
-    # Log server startup
-    logger.info("Starting Financial Datasets MCP Server...")
+    load_dotenv()
+    transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    port = int(os.environ.get("PORT", 8000))
 
-    # Initialize and run the server
-    mcp.run(transport="stdio")
+    logger.info("Starting MCP Server (transport=%s)...", transport)
 
-    # This line won't be reached during normal operation
-    logger.info("Server stopped")
+    if transport == "sse":
+        mcp.run(transport="sse", host="0.0.0.0", port=port)
+    else:
+        mcp.run(transport="stdio")
