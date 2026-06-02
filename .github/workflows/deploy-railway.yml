@@ -9,6 +9,9 @@ on:
       apify_token:
         description: 'APIFY_API_TOKEN'
         required: true
+      railway_token:
+        description: 'Railway API Token (from railway.app/account/tokens)'
+        required: true
 
 jobs:
   deploy:
@@ -18,11 +21,12 @@ jobs:
         env:
           FIRECRAWL_KEY: ${{ github.event.inputs.firecrawl_key }}
           APIFY_TOKEN: ${{ github.event.inputs.apify_token }}
+          RAILWAY_TOKEN: ${{ github.event.inputs.railway_token }}
         run: |
           python3 << 'PYEOF'
-          import urllib.request, json, sys, os
+          import urllib.request, urllib.error, json, sys, os
 
-          TOKEN = "7e8e9762-f08a-4327-b5f0-ea2e2f597ba1"
+          TOKEN = os.environ["RAILWAY_TOKEN"]
           FIRECRAWL = os.environ["FIRECRAWL_KEY"]
           APIFY = os.environ["APIFY_TOKEN"]
           API = "https://backboard.railway.app/graphql/v2"
@@ -33,11 +37,17 @@ jobs:
                   "Content-Type": "application/json",
                   "Authorization": f"Bearer {TOKEN}",
               })
-              with urllib.request.urlopen(req, timeout=30) as r:
-                  result = json.loads(r.read())
-                  if "errors" in result:
-                      print("Error:", result["errors"]); sys.exit(1)
-                  return result["data"]
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      result = json.loads(r.read())
+                      if "errors" in result:
+                          print("GQL errors:", json.dumps(result["errors"], indent=2))
+                          sys.exit(1)
+                      return result["data"]
+              except urllib.error.HTTPError as e:
+                  body = e.read().decode()
+                  print(f"HTTP {e.code}: {body}")
+                  sys.exit(1)
 
           print("=== Deploying MCP Server to Railway ===")
 
