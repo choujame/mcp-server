@@ -1,0 +1,95 @@
+name: Deploy to Railway
+
+on:
+  workflow_dispatch:
+    inputs:
+      firecrawl_key:
+        description: 'FIRECRAWL_API_KEY'
+        required: true
+      apify_token:
+        description: 'APIFY_API_TOKEN'
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via Railway API
+        env:
+          FIRECRAWL_KEY: ${{ github.event.inputs.firecrawl_key }}
+          APIFY_TOKEN: ${{ github.event.inputs.apify_token }}
+        run: |
+          python3 << 'PYEOF'
+          import urllib.request, json, sys, os
+
+          TOKEN = "7e8e9762-f08a-4327-b5f0-ea2e2f597ba1"
+          FIRECRAWL = os.environ["FIRECRAWL_KEY"]
+          APIFY = os.environ["APIFY_TOKEN"]
+          API = "https://backboard.railway.app/graphql/v2"
+
+          def gql(query, variables=None):
+              data = json.dumps({"query": query, "variables": variables or {}}).encode()
+              req = urllib.request.Request(API, data=data, headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer {TOKEN}",
+              })
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  result = json.loads(r.read())
+                  if "errors" in result:
+                      print("Error:", result["errors"]); sys.exit(1)
+                  return result["data"]
+
+          print("=== Deploying MCP Server to Railway ===")
+
+          me = gql("query { me { name email } }")["me"]
+          print(f"Logged in: {me['name']} ({me['email']})")
+
+          project = gql("""
+              mutation($input: ProjectCreateInput!) {
+                projectCreate(input: $input) { id name defaultEnvironment { id } }
+              }
+          """, {"input": {"name": "mcp-server"}})["projectCreate"]
+          pid, eid = project["id"], project["defaultEnvironment"]["id"]
+          print(f"Project: {pid}")
+
+          service = gql("""
+              mutation($input: ServiceCreateInput!) {
+                serviceCreate(input: $input) { id }
+              }
+          """, {"input": {
+              "projectId": pid,
+              "name": "mcp-server",
+              "source": {"repo": "choujame/mcp-server"},
+          }})["serviceCreate"]
+          sid = service["id"]
+          print(f"Service: {sid}")
+
+          for name, value in [
+              ("MCP_TRANSPORT", "sse"),
+              ("FIRECRAWL_API_KEY", FIRECRAWL),
+              ("APIFY_API_TOKEN", APIFY),
+          ]:
+              gql("""
+                  mutation($input: VariableUpsertInput!) { variableUpsert(input: $input) }
+              """, {"input": {"projectId": pid, "serviceId": sid,
+                              "environmentId": eid, "name": name, "value": value}})
+              print(f"Env {name} ✓")
+
+          domain = gql("""
+              mutation($serviceId: String!, $environmentId: String!) {
+                serviceDomainCreate(serviceId: $serviceId, environmentId: $environmentId) {
+                  domain
+                }
+              }
+          """, {"serviceId": sid, "environmentId": eid})["serviceDomainCreate"]["domain"]
+
+          url = f"https://{domain}/sse"
+          print()
+          print("=" * 55)
+          print("DEPLOYED!")
+          print(f"SSE URL: {url}")
+          print()
+          print("Run on your local machine:")
+          print(f"  claude mcp add --scope user --transport sse my-scraper {url}")
+          print("=" * 55)
+          PYEOF
