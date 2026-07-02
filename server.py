@@ -1,6 +1,10 @@
 import asyncio
+import base64
 import json
+import mimetypes
 import os
+import shutil
+import tempfile
 import httpx
 import logging
 import sys
@@ -22,6 +26,11 @@ mcp = FastMCP("financial-datasets")
 FINANCIAL_DATASETS_API_BASE = "https://api.financialdatasets.ai"
 FIRECRAWL_API_BASE = "https://api.firecrawl.dev/v1"
 APIFY_API_BASE = "https://api.apify.com/v2"
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+# Gemini's inline request payload is capped at 20MB; base64 adds ~33% overhead,
+# so keep the source media well under that.
+GEMINI_MAX_INLINE_BYTES = 15 * 1024 * 1024
 
 
 # Helper function to make API requests
@@ -533,6 +542,100 @@ async def apify_scrape(url: str, max_pages: int = 3) -> str:
             return f"Apify run timed out after 180s (run_id={run_id})"
         except Exception as e:
             return f"Error scraping {url} with Apify: {str(e)}"
+
+
+def _download_instagram_media(url: str) -> tuple[str, str]:
+    """Download the best-available audio (or muxed video, if Instagram doesn't
+    expose a separate audio stream) from an Instagram post/reel using yt-dlp.
+
+    Runs synchronously (yt-dlp is blocking) — call via asyncio.to_thread.
+    """
+    import yt_dlp
+
+    tmp_dir = tempfile.mkdtemp(prefix="ig-media-")
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": os.path.join(tmp_dir, "%(id)s.%(ext)s"),
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        file_path = ydl.prepare_filename(info)
+
+    mime_type, _ = mimetypes.guess_type(file_path)
+    return file_path, mime_type or "video/mp4"
+
+
+async def _gemini_transcribe_summary(file_path: str, mime_type: str, api_key: str) -> str:
+    """Send a media file inline to Gemini and ask for a Traditional Chinese transcript + summary."""
+    with open(file_path, "rb") as f:
+        media_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+    gemini_url = f"{GEMINI_API_BASE}/models/{model}:generateContent?key={api_key}"
+
+    prompt = (
+        "請聽這段音檔（或影片中的音訊），先逐字轉錄內容，"
+        "再用繁體中文條列出重點摘要。輸出格式：\n\n"
+        "【逐字稿】\n...\n\n【重點摘要】\n- ...\n- ..."
+    )
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"mime_type": mime_type, "data": media_b64}},
+                ]
+            }
+        ]
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(gemini_url, json=payload, timeout=120.0)
+        response.raise_for_status()
+        data = response.json()
+
+    candidates = data.get("candidates", [])
+    if not candidates:
+        return f"Gemini returned no result: {json.dumps(data)}"
+
+    parts = candidates[0].get("content", {}).get("parts", [])
+    text = "".join(p.get("text", "") for p in parts)
+    return text or "Gemini returned an empty response."
+
+
+@mcp.tool()
+async def instagram_transcribe_summary(url: str) -> str:
+    """Download the audio from an Instagram post/reel and use Gemini to transcribe it
+    and produce a Traditional Chinese (繁體中文) summary.
+
+    Args:
+        url: The Instagram post/reel URL (e.g. https://www.instagram.com/reel/XXXXXXXXXXX/)
+    """
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return "Error: GEMINI_API_KEY not set in environment"
+
+    file_path = None
+    try:
+        file_path, mime_type = await asyncio.to_thread(_download_instagram_media, url)
+
+        size = os.path.getsize(file_path)
+        if size > GEMINI_MAX_INLINE_BYTES:
+            return (
+                f"Error: downloaded media is {size / 1_000_000:.1f}MB, which exceeds the "
+                f"{GEMINI_MAX_INLINE_BYTES / 1_000_000:.0f}MB limit for inline transcription."
+            )
+
+        return await _gemini_transcribe_summary(file_path, mime_type, api_key)
+    except Exception as e:
+        return f"Error processing Instagram media: {str(e)}"
+    finally:
+        if file_path:
+            shutil.rmtree(os.path.dirname(file_path), ignore_errors=True)
 
 
 if __name__ == "__main__":
