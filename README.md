@@ -19,6 +19,11 @@ This MCP server provides the following tools:
 - **get_crypto_prices**: Gets historical prices for a crypto currency.
 - **get_historical_crypto_prices**: Gets historical prices for a crypto currency.
 - **get_current_crypto_price**: Get the current / latest price of a crypto currency.
+- **get_sec_filings**: Get all SEC filings for a company.
+- **firecrawl_scrape**: Scrape a single webpage using Firecrawl and return clean content.
+- **firecrawl_crawl**: Crawl an entire website using Firecrawl and return clean markdown from multiple pages.
+- **apify_scrape**: Scrape a webpage (or small site) using Apify's Website Content Crawler actor.
+- **instagram_transcribe_summary**: Download the audio from an Instagram post/reel and use Gemini to transcribe it and produce a Traditional Chinese (繁體中文) summary.
 
 ## Setup
 
