@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re as _re
 import httpx
 import logging
 import sys
@@ -21,7 +22,7 @@ mcp = FastMCP("financial-datasets")
 # Constants
 FINANCIAL_DATASETS_API_BASE = "https://api.financialdatasets.ai"
 FIRECRAWL_API_BASE = "https://api.firecrawl.dev/v1"
-APIFY_API_BASE = "https://api.apify.com/v2"
+APICY_API_BASE = "https://api.apify.com/v2"
 
 
 # Helper function to make API requests
@@ -533,6 +534,200 @@ async def apify_scrape(url: str, max_pages: int = 3) -> str:
             return f"Apify run timed out after 180s (run_id={run_id})"
         except Exception as e:
             return f"Error scraping {url} with Apify: {str(e)}"
+
+
+# ---------------------------------------------------------------------------
+# Scrapling tools
+# ---------------------------------------------------------------------------
+
+def _truncate(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + f"\n\n[... {len(text) - max_chars} more characters truncated]"
+
+
+def _el_to_dict(el) -> dict:
+    item: dict = {"text": el.text or ""}
+    try:
+        item["tag"] = el.tag
+    except AttributeError:
+        pass
+    try:
+        item["attributes"] = dict(el.attrib)
+    except (AttributeError, TypeError):
+        pass
+    return item
+
+
+@mcp.tool()
+async def scrapling_fetch(
+    url: str,
+    css_selector: str | None = None,
+    max_chars: int = 8000,
+) -> str:
+    """Fetch a URL with Scrapling's fast HTTP fetcher (no JavaScript, but uses stealth headers).
+
+    Returns the full page text, or if css_selector is provided, only the matching elements.
+    Ideal for static pages. For JS-heavy or bot-protected pages use scrapling_fetch_stealth.
+
+    Args:
+        url: The URL to fetch
+        css_selector: Optional CSS selector to extract specific elements (e.g. "article p", ".price", "h1")
+        max_chars: Maximum characters to return (default: 8000)
+    """
+    def _fetch():
+        from scrapling.fetchers import Fetcher
+        page = Fetcher(auto_match=False).get(url, stealthy_headers=True, follow_redirects=True)
+        if css_selector:
+            elements = list(page.css(css_selector))
+            results = [_el_to_dict(el) for el in elements[:50]]
+            return json.dumps(
+                {"selector": css_selector, "count": len(results), "elements": results},
+                indent=2, ensure_ascii=False,
+            )
+        return page.get_all_text(separator="\n", strip=True)
+
+    try:
+        result = await asyncio.to_thread(_fetch)
+        return _truncate(str(result), max_chars)
+    except Exception as e:
+        return f"scrapling_fetch error ({url}): {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+async def scrapling_fetch_stealth(
+    url: str,
+    css_selector: str | None = None,
+    headless: bool = True,
+    max_chars: int = 8000,
+) -> str:
+    """Fetch a URL using a real browser with stealth fingerprinting (Playwright).
+
+    Handles Cloudflare Turnstile, JS-rendered pages, and other anti-bot measures.
+    Slower than scrapling_fetch. Requires Playwright: run `scrapling install` after pip install.
+
+    Args:
+        url: The URL to fetch
+        css_selector: Optional CSS selector to extract specific elements
+        headless: Run browser without a visible window (default: True)
+        max_chars: Maximum characters to return (default: 8000)
+    """
+    def _fetch():
+        from scrapling.fetchers import PlayWrightFetcher
+        page = PlayWrightFetcher().fetch(url, headless=headless, network_idle=True)
+        if css_selector:
+            elements = list(page.css(css_selector))
+            results = [_el_to_dict(el) for el in elements[:50]]
+            return json.dumps(
+                {"selector": css_selector, "count": len(results), "elements": results},
+                indent=2, ensure_ascii=False,
+            )
+        return page.get_all_text(separator="\n", strip=True)
+
+    try:
+        result = await asyncio.to_thread(_fetch)
+        return _truncate(str(result), max_chars)
+    except ImportError:
+        return "Playwright not installed. Run: pip install scrapling && scrapling install"
+    except Exception as e:
+        return f"scrapling_fetch_stealth error ({url}): {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+async def scrapling_find_elements(
+    url: str,
+    query: str,
+    method: str = "css",
+    limit: int = 20,
+    use_browser: bool = False,
+) -> str:
+    """Find elements on a webpage using CSS selector, text content, or regex pattern.
+
+    Scrapling's adaptive selectors auto-match even when the site's HTML changes slightly.
+
+    Args:
+        url: The URL to search
+        query: CSS selector, text snippet, or regex pattern depending on `method`
+        method: How to locate elements — "css" (default), "text" (contains text), or "regex"
+        limit: Maximum elements to return (default: 20)
+        use_browser: Use Playwright browser instead of basic HTTP (default: False)
+    """
+    def _fetch():
+        if use_browser:
+            from scrapling.fetchers import PlayWrightFetcher
+            page = PlayWrightFetcher().fetch(url, headless=True, network_idle=True)
+        else:
+            from scrapling.fetchers import Fetcher
+            page = Fetcher(auto_match=False).get(url, stealthy_headers=True, follow_redirects=True)
+
+        if method == "css":
+            elements = list(page.css(query))
+        elif method == "text":
+            elements = list(page.find_by_text(query, partial=True))
+        elif method == "regex":
+            elements = list(page.find_by_regex(query))
+        else:
+            return json.dumps({"error": f"Unknown method '{method}'. Use 'css', 'text', or 'regex'"})
+
+        results = [_el_to_dict(el) for el in elements[:limit]]
+        return json.dumps(
+            {"method": method, "query": query, "total_found": len(elements), "results": results},
+            indent=2, ensure_ascii=False,
+        )
+
+    try:
+        return await asyncio.to_thread(_fetch)
+    except Exception as e:
+        return f"scrapling_find_elements error ({url}): {type(e).__name__}: {e}"
+
+
+@mcp.tool()
+async def scrapling_extract_links(
+    url: str,
+    filter_pattern: str | None = None,
+    limit: int = 100,
+    use_browser: bool = False,
+) -> str:
+    """Extract all hyperlinks from a webpage.
+
+    Args:
+        url: The URL to extract links from
+        filter_pattern: Optional regex to filter href values (e.g. r".*\\.pdf$", r".*/blog/.*")
+        limit: Maximum links to return (default: 100)
+        use_browser: Use Playwright browser (default: False)
+    """
+    def _fetch():
+        if use_browser:
+            from scrapling.fetchers import PlayWrightFetcher
+            page = PlayWrightFetcher().fetch(url, headless=True, network_idle=True)
+        else:
+            from scrapling.fetchers import Fetcher
+            page = Fetcher(auto_match=False).get(url, stealthy_headers=True, follow_redirects=True)
+
+        seen: set[str] = set()
+        links = []
+        for el in page.css("a"):
+            try:
+                href = (el.attrib.get("href") or "").strip()
+            except (AttributeError, TypeError):
+                continue
+            if not href or href.startswith("#") or href.startswith("javascript:") or href.startswith("mailto:"):
+                continue
+            if filter_pattern and not _re.search(filter_pattern, href):
+                continue
+            if href not in seen:
+                seen.add(href)
+                links.append({"url": href, "text": (el.text or "").strip()})
+
+        return json.dumps(
+            {"total_found": len(links), "links": links[:limit]},
+            indent=2, ensure_ascii=False,
+        )
+
+    try:
+        return await asyncio.to_thread(_fetch)
+    except Exception as e:
+        return f"scrapling_extract_links error ({url}): {type(e).__name__}: {e}"
 
 
 if __name__ == "__main__":
