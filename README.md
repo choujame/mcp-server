@@ -19,6 +19,19 @@ This MCP server provides the following tools:
 - **get_crypto_prices**: Gets historical prices for a crypto currency.
 - **get_historical_crypto_prices**: Gets historical prices for a crypto currency.
 - **get_current_crypto_price**: Get the current / latest price of a crypto currency.
+- **firecrawl_scrape**: Scrape a single webpage with Firecrawl.
+- **firecrawl_crawl**: Crawl an entire website with Firecrawl.
+- **apify_scrape**: Scrape a webpage using Apify's Website Content Crawler.
+- **browser_scrape**: Scrape a webpage with a real headless browser (Playwright) as a fallback for pages that need JavaScript rendering. Requires the optional `browser` extra (see below).
+
+## Optional Dependencies
+
+Some tools require extra packages that aren't installed by default:
+
+```bash
+pip install "mcp-server[browser]"   # Playwright fallback for hard pages (browser_scrape)
+python -m playwright install chromium
+```
 
 ## Setup
 
