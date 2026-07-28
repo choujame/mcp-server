@@ -535,6 +535,41 @@ async def apify_scrape(url: str, max_pages: int = 3) -> str:
             return f"Error scraping {url} with Apify: {str(e)}"
 
 
+@mcp.tool()
+async def browser_scrape(url: str) -> str:
+    """Scrape a webpage with a real headless browser (Playwright/Chromium).
+    Use this as a last-resort fallback when firecrawl_scrape and apify_scrape fail
+    or the page requires JavaScript rendering that they can't handle.
+    Requires the optional 'browser' extra: pip install "mcp-server[browser]" && python -m playwright install chromium
+
+    Args:
+        url: The URL to scrape
+    """
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        return (
+            "Error: Playwright is not installed. Install the optional browser extra with:\n"
+            '  pip install "mcp-server[browser]"\n'
+            "  python -m playwright install chromium"
+        )
+
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            try:
+                page = await browser.new_page()
+                await page.goto(url, wait_until="networkidle", timeout=60000)
+                title = await page.title()
+                text = await page.inner_text("body")
+                result = {"url": url, "title": title, "text": text}
+                return json.dumps(result, indent=2)
+            finally:
+                await browser.close()
+    except Exception as e:
+        return f"Error scraping {url} with browser: {str(e)}"
+
+
 if __name__ == "__main__":
     load_dotenv()
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
