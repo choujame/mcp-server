@@ -6,6 +6,8 @@ This is a Model Context Protocol (MCP) server that provides access to stock mark
 
 It allows Claude and other AI assistants to retrieve income statements, balance sheets, cash flow statements, stock prices, and market news directly through the MCP interface.
 
+See it in action: https://x.com/axiaisacat/status/2043881716104794294?s=46&t=iF02zvG3DIyZo7dMXoanmQ
+
 ## Available Tools
 
 This MCP server provides the following tools:
